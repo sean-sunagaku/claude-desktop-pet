@@ -23,6 +23,7 @@ inspired by "desktop pet" companions, built for Claude.
 - **Session cards** — stacks up to 6 active sessions as cards, each with a mini crab showing that session's mood
 - **Click a card to jump to that session** — opens it in Claude Desktop via the `claude://resume` deep link
 - **Voice narration** — VOICEVOX (Zundamon) or the macOS system voice reads out events in real time (switchable / off in the menu)
+- **Faces where it's going** — while dragged, Clawn leans into the direction of travel and its eyes follow; it settles back to front when you stop
 - **Mini by default** — Clawn starts as a tiny 116×112 buddy. A badge on its shoulder shows the number of active sessions (orange while working, green otherwise). Click to expand into the full view with session cards, click again to shrink back; watching, narration and notifications continue while mini
 - **A different voice per session** — VOICEVOX speakers are auto-assigned per project, so you can tell sessions apart by ear
 - **Reply notifications** — finished responses also land in Notification Center; clicking one jumps to that session
@@ -112,6 +113,7 @@ narrated at "thinking → done" granularity (message bodies aren't available).
 | `CLAWN_DEMO=1` | Play a demo of all motions at launch |
 | `CLAWN_WATCH_DIR` / `CLAWN_HISTORY` / `CLAWN_MAINLOG` | Override watched paths (for testing) |
 | `CLAWN_SNAPSHOT_PATH` | Where SIGUSR1 snapshots are written |
+| `CLAWN_TEST_FACING` | Pin the facing pose (`1`=right, `-1`=left; for visual testing) |
 
 Signals: `SIGUSR1` = save a PNG snapshot of the pet, `SIGUSR2` = toggle demo.
 

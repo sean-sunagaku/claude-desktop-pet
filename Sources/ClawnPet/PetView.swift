@@ -30,6 +30,11 @@ final class PetView: NSView {
     var onCardClick: ((Int) -> Void)?
     private var dragStartPoint: NSPoint?
     private var dragMoved = false
+
+    // 移動方向を向く演出: -1(左) 〜 0(正面) 〜 +1(右)
+    private var facing: CGFloat = 0
+    private var lastWinX: CGFloat?
+    private let testFacing = CGFloat(Double(ProcessInfo.processInfo.environment["CLAWN_TEST_FACING"] ?? "") ?? 0)
     private var pendingClick: DispatchWorkItem?
 
     // カラーパレット
@@ -47,12 +52,27 @@ final class PetView: NSView {
 
     func tick(_ dt: CFTimeInterval) {
         t += dt
+        updateFacing()
         let now = CACurrentMediaTime()
         if now >= nextBlinkAt {
             blinkUntil = now + 0.13
             nextBlinkAt = now + CFTimeInterval.random(in: 2.2...5.5)
         }
         needsDisplay = true
+    }
+
+    /// ウィンドウの水平移動速度から向きを更新（ドラッグ中は performDrag に委譲していて
+    /// マウスイベントが来ないため、フレームごとの位置差分で検出する）
+    private func updateFacing() {
+        guard let x = window?.frame.origin.x else { return }
+        let dx = x - (lastWinX ?? x)
+        lastWinX = x
+        let target = max(-1, min(1, dx / 6)) // 6px/フレームで全振り
+        // 動き出しは素早く向き、止まるとゆっくり正面へ戻る
+        let rate: CGFloat = abs(target) > abs(facing) ? 0.35 : 0.10
+        facing += (target - facing) * rate
+        if abs(facing) < 0.01 { facing = 0 }
+        if testFacing != 0 { facing = testFacing }
     }
 
     override func rightMouseDown(with event: NSEvent) { onRightClick?(event) }
@@ -141,10 +161,21 @@ final class PetView: NSView {
 
     private func drawCrab(cx: CGFloat, baseY: CGFloat, breatheY: CGFloat, jump: CGFloat, phase: CGFloat) {
         drawShadow(cx: cx, jump: jump)
+        // 移動方向へ体ごと少し傾く（影は傾けない）
+        let tilted = abs(facing) >= 0.01
+        if tilted {
+            NSGraphicsContext.saveGraphicsState()
+            let tf = NSAffineTransform()
+            tf.translateX(by: cx, yBy: baseY - 30)
+            tf.rotate(byDegrees: -facing * 6)
+            tf.translateX(by: -cx, yBy: -(baseY - 30))
+            tf.concat()
+        }
         drawLegs(cx: cx, y: baseY)
         drawClaws(cx: cx, y: baseY, phase: phase)
         drawBody(cx: cx, y: baseY, breatheY: breatheY)
         drawFace(cx: cx, y: baseY)
+        if tilted { NSGraphicsContext.restoreGraphicsState() }
         drawExtras(cx: cx, y: baseY, phase: phase)
     }
 
@@ -411,20 +442,21 @@ final class PetView: NSView {
         body.lineWidth = 2.5
         body.stroke()
 
-        // おなかの模様
-        let belly = NSBezierPath(ovalIn: NSRect(x: cx - 34, y: y - bh / 2 + 6, width: 68, height: 36))
+        // おなかの模様（向いた方向へ少し寄せて立体感を出す）
+        let belly = NSBezierPath(ovalIn: NSRect(x: cx - 34 + facing * 5, y: y - bh / 2 + 6, width: 68, height: 36))
         bellyColor.withAlphaComponent(0.9).setFill()
         belly.fill()
     }
 
-    private func drawFace(cx: CGFloat, y: CGFloat) {
+    private func drawFace(cx rawCx: CGFloat, y: CGFloat) {
+        let cx = rawCx + facing * 7 // 顔全体が移動方向へ寄る
         let now = CACurrentMediaTime()
         let blinking = now < blinkUntil || mood == .sleeping
 
         // 目の位置（体の上部・目玉は柄付き）
         for side in [CGFloat(-1), 1] {
             let ex = cx + side * 22
-            let stalkTop = NSPoint(x: ex, y: y + 52)
+            let stalkTop = NSPoint(x: ex + facing * 4, y: y + 52) // 柄の先が向く方向へ倒れる
             // 柄
             let stalk = NSBezierPath()
             stalk.lineWidth = 6
@@ -460,6 +492,7 @@ final class PetView: NSView {
                 case .celebrating: look = NSPoint(x: 0, y: 1.5)
                 default: look = NSPoint(x: sin(t * 0.7) * 1.8, y: 0)
                 }
+                look.x += facing * 3.5 // 移動方向を見る
                 let pupil = NSBezierPath(ovalIn: NSRect(x: stalkTop.x - 4.5 + look.x, y: stalkTop.y - 2.5 + look.y, width: 9, height: 9))
                 pupilColor.setFill()
                 pupil.fill()
