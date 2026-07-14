@@ -125,7 +125,7 @@
 
 <section id="overview">
 <h2>1. 概要と設計原則</h2>
-<p>ClawnPet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・吹き出し・音声で実況するアプリです。</p>
+<p>ClawnPet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・セッションカード・音声で実況するアプリです。</p>
 <div class="cards">
   <div class="card"><h4>📖 読み取りのみ</h4><p>Claude アプリが元々ローカルに書き出すファイルを tail するだけ。ネットワーク送信・プロセス介入・UI 自動操作は一切しない（VOICEVOX への localhost リクエストを除く）。</p></div>
   <div class="card"><h4>🧩 依存ゼロ</h4><p>Swift + AppKit + AVFoundation のみ。<code>swiftc</code> 一発でビルドでき、パッケージマネージャも Xcode プロジェクトも不要。</p></div>
@@ -184,7 +184,7 @@
   <!-- View & Speech -->
   <rect x="290" y="370" width="240" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
   <text x="302" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">PetView（AppKit / 30fps）</text>
-  <text x="302" y="414" fill="var(--ink)" font-size="11">メイン Clawn + 吹き出し</text>
+  <text x="302" y="414" fill="var(--ink)" font-size="11">メイン Clawn + バッジ</text>
   <text x="302" y="432" fill="var(--ink)" font-size="11">セッションカード / ミニ表示</text>
   <rect x="570" y="370" width="230" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
   <text x="582" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">SpeechManager</text>
@@ -229,7 +229,7 @@
 <tr><td><code>PetCore.swift</code></td><td>ドメイン層。イベント定義・セッションごとの状態マシン・表示/発話文言の生成</td><td><code>PetEvent</code> <code>PetMood</code> <code>PetBrain</code> <code>SessionCard</code></td></tr>
 <tr><td><code>Watchers.swift</code></td><td>ファイル監視層。差分 tail（ローテーション対応）と JSONL / ログのパース</td><td><code>TailReader</code> <code>PollingWatcher</code> と各 Watcher</td></tr>
 <tr><td><code>Speech.swift</code></td><td>音声実況。VOICEVOX HTTP API とシステム音声の切替・レート制限</td><td><code>SpeechManager</code></td></tr>
-<tr><td><code>PetView.swift</code></td><td>描画層。Clawn 本体（全モーション）・吹き出し・セッションカード・ミニ表示・クリック/ドラッグ判定</td><td><code>PetView</code></td></tr>
+<tr><td><code>PetView.swift</code></td><td>描画層。Clawn 本体（全モーション）・セッションカード・開閉コントロール（バッジ / ˅）・クリック/ドラッグ判定</td><td><code>PetView</code></td></tr>
 <tr><td><code>Notifier.swift</code></td><td>応答到着の通知センター連携。<code>UNUserNotificationCenter</code> → 許可が下りない環境は <code>osascript</code> にフォールバック。通知タップでセッションジャンプ</td><td><code>Notifier</code></td></tr>
 <tr><td><code>CDPWatcher.swift</code></td><td>claude.ai Web チャット監視（opt-in）。<code>/json</code> でページ探索 → WebSocket で Network ドメイン購読</td><td><code>CDPWatcher</code></td></tr>
 <tr><td><code>AppDelegate.swift</code></td><td>結線。ウィンドウ管理（伸縮）・イベントルーティング・メニューバー・デモ・シグナル</td><td><code>AppDelegate</code> <code>SessionTrack</code></td></tr>
@@ -305,7 +305,7 @@
 <p>Router（AppDelegate）は sessionId（= transcript のファイル名）ごとに <code>SessionTrack</code> を生成し、イベントを対応する PetBrain に配送します。</p>
 <ul class="notes">
   <li><b>primary 選定:</b> <code>lastEvent</code> が最新の Track がメインの Clawn を駆動する。セッションが 1 つもない時は <code>defaultBrain</code>（挨拶用）を表示。</li>
-  <li><b>pending prompt 昇格:</b> <code>history.jsonl</code> のプロンプトは transcript より先に届くことがある。未知の sessionId なら 15 秒だけ保留し、transcript 側の <code>userMessage</code> が来た瞬間に本文付きの <code>userPrompt</code> へ昇格させる。これで新規セッションの 1 通目から本文を吹き出しに出せる。</li>
+  <li><b>pending prompt 昇格:</b> <code>history.jsonl</code> のプロンプトは transcript より先に届くことがある。未知の sessionId なら 15 秒だけ保留し、transcript 側の <code>userMessage</code> が来た瞬間に本文付きの <code>userPrompt</code> へ昇格させる。これで新規セッションの 1 通目から本文を実況（音声・通知）に使える。</li>
   <li><b>prune:</b> 30 分イベントがない Track は破棄（カードも消える）。追跡は直近更新の transcript 最大 6 本。</li>
   <li><b>Desktop イベント:</b> <code>main.log</code> の sessionId（<code>local_*</code>）は transcript の sessionId と対応しないため、primary Track に配送する。</li>
   <li><b>サブエージェント:</b> <code>isSidechain: true</code> の行はツール実行のみ拾い、「(サブエージェント)」の接頭辞を付ける。</li>
@@ -318,44 +318,44 @@
 <figure class="figure">
 <svg viewBox="0 0 760 300" width="100%" xmlns="http://www.w3.org/2000/svg">
   <g font-size="11">
-    <!-- expanded with cards -->
+    <!-- open: cards + close button + crab -->
     <rect x="30" y="16" width="200" height="268" rx="10" fill="none" stroke="var(--coral)" stroke-width="1.5"/>
-    <text x="130" y="8" text-anchor="middle" fill="var(--sub)" font-size="10.5">ひらく + カード（260 × 244+54n）</text>
-    <rect x="42" y="28" width="176" height="40" rx="8" fill="var(--code-bg)" stroke="var(--coral)" stroke-width="1.4"/>
+    <text x="130" y="8" text-anchor="middle" fill="var(--sub)" font-size="10.5">ひらく（260 × 146+54n）</text>
+    <rect x="42" y="28" width="176" height="40" rx="12" fill="var(--code-bg)" stroke="var(--coral)" stroke-width="1.4"/>
     <text x="50" y="52" fill="var(--ink)">🦀 カード1（primary 強調枠）</text>
-    <rect x="42" y="74" width="176" height="40" rx="8" fill="var(--code-bg)" stroke="var(--line)"/>
+    <rect x="42" y="74" width="176" height="40" rx="12" fill="var(--code-bg)" stroke="var(--line)"/>
     <text x="50" y="98" fill="var(--ink)">🦀 カード2</text>
-    <text x="206" y="130" fill="var(--sub)">▾ 開閉ボタン</text>
-    <rect x="42" y="140" width="176" height="64" rx="10" fill="var(--panel)" stroke="var(--line)"/>
-    <text x="50" y="166" fill="var(--ink)" font-weight="bold">吹き出し（状態 + 文脈）</text>
-    <text x="50" y="186" fill="var(--sub)">しっぽは Clawn の頭上へ</text>
-    <text x="130" y="252" text-anchor="middle" font-size="30">🦀</text>
-    <text x="130" y="274" text-anchor="middle" fill="var(--sub)">Clawn 本体（アニメーション）</text>
-    <!-- collapsed -->
+    <circle cx="176" cy="152" r="12" fill="var(--code-bg)" stroke="var(--line)"/>
+    <text x="176" y="157" text-anchor="middle" fill="var(--ink)" font-size="11">˅</text>
+    <text x="120" y="157" text-anchor="end" fill="var(--sub)">とじるボタン →</text>
+    <text x="176" y="220" text-anchor="middle" font-size="26">🦀</text>
+    <text x="130" y="274" text-anchor="middle" fill="var(--sub)">カニは右下 116×112 に固定サイズ</text>
+    <!-- closed -->
     <rect x="330" y="180" width="84" height="86" rx="10" fill="none" stroke="var(--coral)" stroke-width="1.5"/>
     <text x="372" y="172" text-anchor="middle" fill="var(--sub)" font-size="10.5">とじる（116 × 112）</text>
-    <text x="404" y="204" font-size="13">🔧</text>
+    <circle cx="404" cy="200" r="10" fill="var(--coral)"/>
+    <text x="404" y="204" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">3</text>
     <text x="372" y="246" text-anchor="middle" font-size="24">🦀</text>
     <!-- arrows -->
     <path d="M 240 150 Q 285 150 326 200" fill="none" stroke="var(--sub)" stroke-width="1.4" marker-end="url(#arr)"/>
-    <text x="262" y="140" fill="var(--sub)">クリック</text>
+    <text x="252" y="140" fill="var(--sub)">˅ をクリック</text>
     <path d="M 330 240 Q 280 260 238 220" fill="none" stroke="var(--sub)" stroke-width="1.4" marker-end="url(#arr)"/>
-    <text x="268" y="272" fill="var(--sub)">クリック</text>
+    <text x="248" y="276" fill="var(--sub)">バッジをクリック</text>
     <!-- notes -->
     <g font-size="11.5" fill="var(--ink)">
       <text x="480" y="40">・ウィンドウは右端アンカーで伸縮</text>
       <text x="480" y="64">・borderless / 透過 / .floating / 全スペース追従</text>
       <text x="480" y="88">・ドラッグ移動（3px 超で performDrag）。移動中は進行方向を向く</text>
       <text x="480" y="112">・クリック = なでる（250ms 待ってダブルと判別）</text>
-      <text x="480" y="136">・ダブルクリック = 開閉。誤クリックでは巨大化しない</text>
-      <text x="480" y="160">・デフォルトはミニ。0.52 倍描画 + セッション数バッジ</text>
-      <text x="480" y="184">・バッジ色 = 気分（作業中オレンジ / ふだん緑）。ミニでも監視・実況は継続</text>
-      <text x="480" y="208">・カードはアクティブセッション数だけ積む</text>
+      <text x="480" y="136">・バッジ = ひらく / 頭上の ˅ = とじる（ダブルクリックでも切替）</text>
+      <text x="480" y="160">・カニは開閉共通で 0.52 倍・右下 116×112 領域（サイズ不変）</text>
+      <text x="480" y="184">・バッジ色 = 状態（作業中オレンジ / ふだん緑）。とじても監視・実況は継続</text>
+      <text x="480" y="208">・カードはアクティブセッション数だけ積む（吹き出しは廃止）</text>
       <text x="480" y="232">・位置/開閉/音声設定は UserDefaults に永続化</text>
     </g>
   </g>
 </svg>
-<figcaption>ひらく ⇄ とじる。描画はモデル座標（幅 280）固定で、展開時 0.74 倍・ミニ表示 0.52 倍にアフィン変換で縮小する（吹き出し・カードの文字サイズは等倍のまま）</figcaption>
+<figcaption>ひらく ⇄ とじる。カニはどちらの状態でも同じ縮尺（0.52 倍）・同じ右下領域に描くため、開閉で大きさも画面位置も変わらない。ひらくとカードスタックと ˅ ボタンが上に乗る</figcaption>
 </figure>
 </section>
 

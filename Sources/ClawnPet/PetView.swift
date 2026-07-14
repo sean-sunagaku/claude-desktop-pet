@@ -5,20 +5,17 @@ import AppKit
 final class PetView: NSView {
     // 表示状態
     var mood: PetMood = .idle { didSet { if oldValue != mood { moodChangedAt = CACurrentMediaTime() } } }
-    var statusLine: String = "こんにちは！Clawn だよ"
-    var contextLine: String = "Claude の作業を見守るね"
-    var sessionsInfo: String = ""
     var sessionCards: [SessionCard] = []
-    var cardsVisible = true
     var collapsed = false
-    var sessionCount = 0 // ミニ表示バッジ用のアクティブセッション数
+    var sessionCount = 0 // バッジ用のアクティブセッション数
 
-    static let petAreaHeight: CGFloat = 244 // ペット+吹き出しの基本領域
-    private static let expandedScale: CGFloat = 0.74 // 展開時のカニ縮尺（ミニとのギャップ緩和）
+    // カニは開閉どちらも同じサイズ（右下の 116×112 領域に 0.52 倍描画）。
+    // 開いたときはその上にカードスタックと閉じるボタン（˅）が乗るだけ。
+    static let petAreaHeight: CGFloat = 146 // カニ領域 112 + 閉じるボタン域 34
     static let cardHeight: CGFloat = 48
     static let cardGap: CGFloat = 6
     static let collapsedSize = NSSize(width: 116, height: 112)
-    private static let collapsedScale: CGFloat = 0.52
+    private static let crabScale: CGFloat = 0.52
 
     // アニメーション用
     private var t: CFTimeInterval = 0
@@ -29,6 +26,8 @@ final class PetView: NSView {
     var onDoubleClick: (() -> Void)?
     var onClick: (() -> Void)?
     var onCardClick: ((Int) -> Void)?
+    var onBadgeClick: (() -> Void)?  // 閉時の数字バッジ → ひらく
+    var onCloseClick: (() -> Void)?  // 開時の ˅ ボタン → とじる
     private var dragStartPoint: NSPoint?
     private var dragMoved = false
 
@@ -109,6 +108,14 @@ final class PetView: NSView {
         defer { dragStartPoint = nil }
         guard dragStartPoint != nil, !dragMoved else { return }
         let p = convert(event.locationInWindow, from: nil)
+        if collapsed, sessionCount > 0, badgeRect().insetBy(dx: -4, dy: -4).contains(p) {
+            onBadgeClick?() // バッジ → セッション情報をひらく
+            return
+        }
+        if !collapsed, closeButtonRect().insetBy(dx: -4, dy: -4).contains(p) {
+            onCloseClick?() // ˅ → とじる
+            return
+        }
         if let idx = cardIndex(at: p) {
             onCardClick?(idx) // カードは即時反応（セッションへジャンプ）
             return
@@ -147,29 +154,66 @@ final class PetView: NSView {
 
         let baseY: CGFloat = 68 + bob + jump  // 体の中心 Y
 
-        if collapsed {
-            // ミニ表示: カニだけを縮小描画（吹き出し・カードなし）
-            NSGraphicsContext.saveGraphicsState()
-            let tf = NSAffineTransform()
-            tf.translateX(by: Self.collapsedSize.width / 2 - cx * Self.collapsedScale, yBy: 4)
-            tf.scale(by: Self.collapsedScale)
-            tf.concat()
-            drawCrab(cx: cx, baseY: baseY, breatheY: breatheY, jump: jump, phase: phase)
-            NSGraphicsContext.restoreGraphicsState()
-            drawCollapsedBadge()
-            return
-        }
-
-        // 展開時もカニは少し縮小して描く（吹き出し・カードの文字サイズは維持）
+        // カニは開閉共通: 右下の 116×112 領域に同じ縮尺で描く（開閉でサイズが変わらない）
+        let crabOriginX = bounds.width - Self.collapsedSize.width
         NSGraphicsContext.saveGraphicsState()
         let tf = NSAffineTransform()
-        tf.translateX(by: cx * (1 - Self.expandedScale), yBy: 8)
-        tf.scale(by: Self.expandedScale)
+        tf.translateX(by: crabOriginX + Self.collapsedSize.width / 2 - cx * Self.crabScale, yBy: 4)
+        tf.scale(by: Self.crabScale)
         tf.concat()
         drawCrab(cx: cx, baseY: baseY, breatheY: breatheY, jump: jump, phase: phase)
         NSGraphicsContext.restoreGraphicsState()
-        drawBubble(cx: cx)
-        drawSessionCards()
+
+        if collapsed {
+            drawCollapsedBadge()
+        } else {
+            drawCloseButton()
+            drawSessionCards()
+        }
+    }
+
+    // MARK: 開閉コントロール（バッジ / ˅ ボタン）
+
+    /// 閉時の数字バッジの矩形（カニ領域の右上）
+    private func badgeRect() -> NSRect {
+        let d: CGFloat = 26
+        let ox = bounds.width - Self.collapsedSize.width
+        return NSRect(x: ox + Self.collapsedSize.width - d - 8, y: Self.collapsedSize.height - d - 4,
+                      width: d, height: d)
+    }
+
+    /// 開時の閉じるボタン（˅）の矩形（カニの頭上）
+    private func closeButtonRect() -> NSRect {
+        let cxScreen = bounds.width - Self.collapsedSize.width / 2
+        return NSRect(x: cxScreen - 12, y: Self.collapsedSize.height + 4, width: 24, height: 24)
+    }
+
+    /// カニの頭上の丸い ˅ ボタン（クリックでとじる）
+    private func drawCloseButton() {
+        let rect = closeButtonRect()
+        panelColor.setFill()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.30)
+        shadow.shadowOffset = NSSize(width: 0, height: -1.5)
+        shadow.shadowBlurRadius = 4
+        NSGraphicsContext.saveGraphicsState()
+        shadow.set()
+        NSBezierPath(ovalIn: rect).fill()
+        NSGraphicsContext.restoreGraphicsState()
+        panelStroke.setStroke()
+        let ring = NSBezierPath(ovalIn: rect)
+        ring.lineWidth = 1
+        ring.stroke()
+
+        let mark = NSBezierPath()
+        mark.lineWidth = 2
+        mark.lineCapStyle = .round
+        mark.lineJoinStyle = .round
+        mark.move(to: NSPoint(x: rect.midX - 4.5, y: rect.midY + 2.2))
+        mark.line(to: NSPoint(x: rect.midX, y: rect.midY - 2.4))
+        mark.line(to: NSPoint(x: rect.midX + 4.5, y: rect.midY + 2.2))
+        NSColor(white: 0.92, alpha: 1).setStroke()
+        mark.stroke()
     }
 
     private func drawCrab(cx: CGFloat, baseY: CGFloat, breatheY: CGFloat, jump: CGFloat, phase: CGFloat) {
@@ -199,13 +243,11 @@ final class PetView: NSView {
         if sessionCount > 0 {
             let color: NSColor
             switch mood {
-            case .working, .thinking: color = NSColor(red: 0.94, green: 0.60, blue: 0.23, alpha: 1) // 作業中はオレンジ
+            case .working, .thinking: color = busyOrange
             case .sleeping:           color = NSColor(white: 0.58, alpha: 1)
-            default:                  color = NSColor(red: 0.18, green: 0.76, blue: 0.36, alpha: 1) // ふだんは緑
+            default:                  color = doneGreen
             }
-            let d: CGFloat = 26
-            let rect = NSRect(x: Self.collapsedSize.width - d - 8, y: Self.collapsedSize.height - d - 4 + bobY,
-                              width: d, height: d)
+            let rect = badgeRect().offsetBy(dx: 0, dy: bobY)
             NSGraphicsContext.saveGraphicsState()
             let shadow = NSShadow()
             shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
@@ -248,7 +290,7 @@ final class PetView: NSView {
 
     /// クリック位置がどのカードか（カード外なら nil）
     func cardIndex(at point: NSPoint) -> Int? {
-        guard cardsVisible, !collapsed else { return nil }
+        guard !collapsed else { return nil }
         for i in 0..<sessionCards.count {
             let r = cardRect(i)
             if r.minY < Self.petAreaHeight { break }
@@ -258,7 +300,7 @@ final class PetView: NSView {
     }
 
     private func drawSessionCards() {
-        guard cardsVisible, !sessionCards.isEmpty,
+        guard !sessionCards.isEmpty,
               bounds.height > Self.petAreaHeight + Self.cardHeight else { return }
         for (i, card) in sessionCards.enumerated() {
             let rect = cardRect(i)
@@ -642,69 +684,6 @@ final class PetView: NSView {
         path.close()
         color.setFill()
         path.fill()
-    }
-
-    // MARK: 吹き出し
-
-    private func drawBubble(cx: CGFloat) {
-        var status = statusLine
-        if mood == .thinking || mood == .working {
-            let dots = Int(t * 2.4) % 4
-            status += String(repeating: "・", count: dots)
-        }
-
-        let statusAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 12.5, weight: .bold),
-            .foregroundColor: textColor
-        ]
-        var contextText = contextLine
-        if !sessionsInfo.isEmpty { contextText += "  \(sessionsInfo)" }
-        let contextAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 10.5),
-            .foregroundColor: subTextColor
-        ]
-
-        let statusStr = status as NSString
-        let contextStr = contextText as NSString
-        let maxTextWidth: CGFloat = 206
-        let sSize = statusStr.boundingRect(with: NSSize(width: maxTextWidth, height: 60), options: [.usesLineFragmentOrigin], attributes: statusAttrs).size
-        let cSize = contextStr.boundingRect(with: NSSize(width: maxTextWidth, height: 60), options: [.usesLineFragmentOrigin], attributes: contextAttrs).size
-
-        let pad: CGFloat = 11
-        let bw = min(maxTextWidth, max(sSize.width, cSize.width)) + pad * 2
-        let bh = sSize.height + cSize.height + pad * 2 + 3
-        let bx = min(max(cx - bw / 2, 6), bounds.width - bw - 6)
-        let by: CGFloat = 114 // カニ（縮小描画）の頭のすぐ上に固定し、上方向に伸びる
-
-        let alpha: CGFloat = (mood == .sleeping) ? 0.55 : 1.0
-
-        // 吹き出し本体
-        let rect = NSRect(x: bx, y: by, width: bw, height: bh)
-        let bubble = NSBezierPath(roundedRect: rect, xRadius: 13, yRadius: 13)
-        // しっぽ
-        bubble.move(to: NSPoint(x: cx - 8, y: by))
-        bubble.line(to: NSPoint(x: cx, y: by - 10))
-        bubble.line(to: NSPoint(x: cx + 8, y: by))
-        bubble.close()
-
-        panelColor.withAlphaComponent(0.96 * alpha).setFill()
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.30 * alpha)
-        shadow.shadowOffset = NSSize(width: 0, height: -2)
-        shadow.shadowBlurRadius = 6
-        NSGraphicsContext.saveGraphicsState()
-        shadow.set()
-        bubble.fill()
-        NSGraphicsContext.restoreGraphicsState()
-        panelStroke.withAlphaComponent(0.10 * alpha).setStroke()
-        bubble.lineWidth = 1
-        bubble.stroke()
-
-        // テキスト
-        statusStr.draw(in: NSRect(x: bx + pad, y: by + bh - pad - sSize.height, width: bw - pad * 2, height: sSize.height),
-                       withAttributes: statusAttrs)
-        contextStr.draw(in: NSRect(x: bx + pad, y: by + pad, width: bw - pad * 2, height: cSize.height),
-                        withAttributes: contextAttrs)
     }
 
     // MARK: スナップショット（自己検証用）

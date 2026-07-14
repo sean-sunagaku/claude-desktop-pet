@@ -12,7 +12,6 @@ final class SessionTrack {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow!
     private var petView: PetView!
-    private var chevron: NSButton!
     private let defaultBrain = PetBrain() // セッションが 1 つもない時のメイン表示
     private var tracks: [String: SessionTrack] = [:]
     private var pendingPrompts: [String: (String, Date)] = [:] // sessionId -> (text, at)
@@ -47,13 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let debug = ProcessInfo.processInfo.environment["CLAWN_DEBUG"] == "1"
     private let windowWidth: CGFloat = 260
 
-    private var cardsOn: Bool {
-        get { UserDefaults.standard.bool(forKey: "clawn.cards") }
-        set { UserDefaults.standard.set(newValue, forKey: "clawn.cards") }
-    }
-
     private var collapsed: Bool {
-        // デフォルトはミニ表示。クリックで展開したときだけカード等のフル表示になる
+        // デフォルトはとじた状態（カニだけ）。バッジクリックでカードが開く
         get { UserDefaults.standard.object(forKey: "clawn.collapsed") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "clawn.collapsed") }
     }
@@ -63,7 +57,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: [
             "clawn.voice": SpeechManager.Engine.voicevox.rawValue,
-            "clawn.cards": true,
         ])
         setupWindow()
         setupStatusItem()
@@ -112,16 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         petView.onDoubleClick = { [weak self] in self?.toggleCollapsed() }
         petView.onCardClick = { [weak self] idx in self?.jumpToSession(index: idx) }
+        petView.onBadgeClick = { [weak self] in self?.setCollapsed(false) }
+        petView.onCloseClick = { [weak self] in self?.setCollapsed(true) }
         window.contentView = petView
-
-        // セッションカードの開閉ボタン
-        chevron = NSButton(title: "▴", target: self, action: #selector(toggleCards))
-        chevron.isBordered = false
-        chevron.font = NSFont.systemFont(ofSize: 12, weight: .bold)
-        chevron.contentTintColor = NSColor(red: 0.62, green: 0.29, blue: 0.18, alpha: 0.85)
-        chevron.frame = NSRect(x: windowWidth - 40, y: PetView.petAreaHeight - 30, width: 28, height: 20)
-        chevron.toolTip = "セッションカードの表示/非表示"
-        petView.addSubview(chevron)
 
         applyStatus()
         window.orderFrontRegardless()
@@ -281,7 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(voiceRoot)
         menu.setSubmenu(voiceMenu, for: voiceRoot)
 
-        let collapse = NSMenuItem(title: "とじる（ミニ表示）", action: #selector(toggleCollapsedMenu), keyEquivalent: "o")
+        let collapse = NSMenuItem(title: "セッションをとじる", action: #selector(toggleCollapsedMenu), keyEquivalent: "o")
         collapse.target = self
         menu.addItem(collapse)
         collapseMenuItem = collapse
@@ -291,10 +277,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         notify.state = notifier.enabled ? .on : .off
         menu.addItem(notify)
         notifyMenuItem = notify
-
-        let cards = NSMenuItem(title: "セッションカード", action: #selector(toggleCards), keyEquivalent: "c")
-        cards.target = self
-        menu.addItem(cards)
 
         menu.addItem(.separator())
         menu.addItem(withTitle: "デモ再生（全モーション確認）", action: #selector(toggleDemo), keyEquivalent: "d").target = self
@@ -347,15 +329,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         notifyMenuItem?.state = notifier.enabled ? .on : .off
     }
 
-    @objc private func toggleCards() {
-        cardsOn.toggle()
-        applyStatus()
-    }
-
     @objc private func toggleCollapsedMenu() { toggleCollapsed() }
 
-    private func toggleCollapsed() {
-        collapsed.toggle()
+    private func toggleCollapsed() { setCollapsed(!collapsed) }
+
+    private func setCollapsed(_ value: Bool) {
+        collapsed = value
         applyStatus()
     }
 
@@ -461,8 +440,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let status = (primary?.brain ?? defaultBrain).status
 
         petView.mood = status.mood
-        petView.statusLine = status.statusLine
-        petView.contextLine = status.contextLine
 
         cardOrder = sorted.prefix(6).map { $0.sessionId }
         petView.sessionCards = sorted.prefix(6).enumerated().map { i, t in
@@ -474,29 +451,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 isPrimary: i == 0
             )
         }
-        petView.cardsVisible = cardsOn
         petView.collapsed = collapsed
         petView.sessionCount = tracks.count
 
-        if let reg = registry, reg.aliveCount > 0 {
-            petView.sessionsInfo = "session ×\(reg.aliveCount)"
-        } else {
-            petView.sessionsInfo = ""
-        }
         statusMenuInfoItem?.title = "Clawn: \(status.statusLine)"
-        collapseMenuItem?.title = collapsed ? "ひらく" : "とじる（ミニ表示）"
-        chevron.title = cardsOn ? "▾" : "▴"
-        chevron.isHidden = tracks.isEmpty || collapsed
+        collapseMenuItem?.title = collapsed ? "セッションをひらく" : "セッションをとじる"
         updateWindowLayout()
     }
 
     private func updateWindowLayout() {
         let target: NSSize
-        if collapsed {
+        let n = min(tracks.count, 6)
+        if collapsed || n == 0 {
+            // とじた状態はカニだけ（開いていてもカードが無ければ同サイズ）
             target = PetView.collapsedSize
         } else {
-            let n = cardsOn ? min(tracks.count, 6) : 0
-            let h = PetView.petAreaHeight + (n > 0 ? CGFloat(n) * (PetView.cardHeight + PetView.cardGap) + 8 : 0)
+            let h = PetView.petAreaHeight + CGFloat(n) * (PetView.cardHeight + PetView.cardGap) + 8
             target = NSSize(width: windowWidth, height: h)
         }
         guard abs(window.frame.height - target.height) > 0.5 || abs(window.frame.width - target.width) > 0.5 else { return }

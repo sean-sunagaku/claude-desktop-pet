@@ -17,14 +17,14 @@ inspired by "desktop pet" companions, built for Claude.
 ## What it does
 
 - **Always-on-top floating pet** — no Dock icon, follows you across Spaces, draggable
-- **Detects when you send a message** and shows the prompt text in a speech bubble while "thinking"
+- **Detects when you send a message** and goes into "thinking" — status is narrated via session cards and voice
 - **Narrates tool use in real time** — terminal work, code edits, web searches, sub-agents…
 - **Jumps and sparkles when the reply lands**, quoting the first line of the response
 - **Session cards** — stacks up to 6 active sessions as cards, each with a mini crab showing that session's mood
 - **Click a card to jump to that session** — opens it in Claude Desktop via the `claude://resume` deep link
 - **Voice narration** — VOICEVOX (Zundamon) or the macOS system voice reads out events in real time (switchable / off in the menu)
 - **Faces where it's going** — while dragged, Clawn leans into the direction of travel and its eyes follow; it settles back to front when you stop
-- **Mini by default** — Clawn starts as a tiny 116×112 buddy. A badge on its shoulder shows the number of active sessions (orange while working, green otherwise). Double-click to expand into the full view with session cards, double-click again to shrink back (a single click just pets it, so a stray click never resizes anything); watching, narration and notifications continue while mini
+- **The crab never changes size** — same structure as ChatGPT's desktop pet: open or closed, the mascot stays 116×112. **Click the badge (session count) to unfold the cards above it**, and **click the ˅ button over its head to close them**. The badge is orange while working, green otherwise; watching, narration and notifications continue while closed
 - **A different voice per session** — VOICEVOX speakers are auto-assigned per project, so you can tell sessions apart by ear
 - **Reply notifications** — finished responses also land in Notification Center; clicking one jumps to that session
 - **claude.ai web chat support (opt-in)** — launch Claude Desktop with a debug port and ClawnPet narrates web-chat sends/completions too, via CDP
@@ -52,12 +52,13 @@ Auto-start at login: System Settings → General → Login Items → add ClawnPe
 
 | Action | Result |
 |---|---|
-| Click | Pet it (it celebrates; size never changes) |
+| Click the badge (top right) | Open the session cards |
+| ˅ button above its head | Close the session cards |
 | Click a session card | Open that session in Claude Desktop |
+| Click | Pet it (it celebrates; size never changes) |
+| Double-click | Toggle open / closed (same as badge / ˅) |
 | Drag | Move it anywhere (position is remembered) |
-| Double-click | Expand / collapse (mini by default) |
-| ▾ button | Show / hide session cards |
-| Right-click / 🦀 menu bar icon | Menu: voice engine, collapse, demo, quit, … |
+| Right-click / 🦀 menu bar icon | Menu: voice engine, open/close, demo, quit, … |
 
 ## How it works (read-only, nothing leaves your machine)
 
@@ -129,7 +130,7 @@ Sources/ClawnPet/
 ├── main.swift         # entry point
 ├── AppDelegate.swift  # window / menu bar / timers / demo / signals
 ├── PetCore.swift      # PetEvent / PetBrain (state machine)
-├── PetView.swift      # drawing, animation, speech bubble
+├── PetView.swift      # drawing, animation, session cards
 └── Watchers.swift     # TailReader + transcript / history / main.log watchers
 ```
 
