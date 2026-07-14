@@ -24,7 +24,7 @@ inspired by "desktop pet" companions, built for Claude.
 - **Click a card to jump to that session** — opens it in Claude Desktop via the `claude://resume` deep link
 - **Voice narration** — VOICEVOX (Zundamon) or the macOS system voice reads out events in real time (switchable / off in the menu)
 - **Faces where it's going** — while dragged, Clawn leans into the direction of travel and its eyes follow; it settles back to front when you stop
-- **Mini by default** — Clawn starts as a tiny 116×112 buddy. A badge on its shoulder shows the number of active sessions (orange while working, green otherwise). Click to expand into the full view with session cards, click again to shrink back; watching, narration and notifications continue while mini
+- **Mini by default** — Clawn starts as a tiny 116×112 buddy. A badge on its shoulder shows the number of active sessions (orange while working, green otherwise). Double-click to expand into the full view with session cards, double-click again to shrink back (a single click just pets it, so a stray click never resizes anything); watching, narration and notifications continue while mini
 - **A different voice per session** — VOICEVOX speakers are auto-assigned per project, so you can tell sessions apart by ear
 - **Reply notifications** — finished responses also land in Notification Center; clicking one jumps to that session
 - **claude.ai web chat support (opt-in)** — launch Claude Desktop with a debug port and ClawnPet narrates web-chat sends/completions too, via CDP
@@ -52,10 +52,10 @@ Auto-start at login: System Settings → General → Login Items → add ClawnPe
 
 | Action | Result |
 |---|---|
-| Click | Expand / collapse (mini by default) |
+| Click | Pet it (it celebrates; size never changes) |
 | Click a session card | Open that session in Claude Desktop |
 | Drag | Move it anywhere (position is remembered) |
-| Double-click | Pet it (it celebrates) |
+| Double-click | Expand / collapse (mini by default) |
 | ▾ button | Show / hide session cards |
 | Right-click / 🦀 menu bar icon | Menu: voice engine, collapse, demo, quit, … |
 

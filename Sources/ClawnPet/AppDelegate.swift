@@ -103,12 +103,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         petView = PetView(frame: NSRect(origin: .zero, size: size))
         petView.onRightClick = { [weak self] event in self?.showContextMenu(event) }
-        petView.onDoubleClick = { [weak self] in
+        // シングルクリック = なでる（誤クリックでもサイズが変わらない）
+        // ダブルクリック = 開閉。うっかりクリックで巨大化しないよう明示操作に寄せる
+        petView.onClick = { [weak self] in
             guard let self else { return }
             self.primaryBrain().handle(.assistantText(snippet: "なでてくれて ありがと🦀", project: nil))
             self.applyStatus()
         }
-        petView.onClick = { [weak self] in self?.toggleCollapsed() }
+        petView.onDoubleClick = { [weak self] in self?.toggleCollapsed() }
         petView.onCardClick = { [weak self] idx in self?.jumpToSession(index: idx) }
         window.contentView = petView
 
