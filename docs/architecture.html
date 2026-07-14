@@ -106,7 +106,7 @@
 <header class="hero">
   <h1><span class="crab">🦀</span> ClawnPet アーキテクチャ &amp; 実装ドキュメント</h1>
   <p>Claude Desktop / Claude Code の作業をローカルファイル監視だけでリアルタイム実況する macOS デスクトップペットの設計資料</p>
-  <div class="meta">v0.2 ・ 2026-07-14 ・ Swift / AppKit（依存ライブラリゼロ）・ <a href="https://github.com/sean-sunagaku/claude-desktop-pet" style="color:#FFE9DC">GitHub: sean-sunagaku/claude-desktop-pet</a></div>
+  <div class="meta">v0.4 ・ 2026-07-14 ・ Swift / AppKit（依存ライブラリゼロ）・ <a href="https://github.com/sean-sunagaku/claude-desktop-pet" style="color:#FFE9DC">GitHub: sean-sunagaku/claude-desktop-pet</a></div>
 </header>
 
 <nav class="toc">
@@ -128,7 +128,7 @@
 <p>ClawnPet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・セッションカードで実況するアプリです。</p>
 <div class="cards">
   <div class="card"><h4>📖 読み取りのみ</h4><p>Claude アプリが元々ローカルに書き出すファイルを tail するだけ。ネットワーク送信・プロセス介入・UI 自動操作は一切しない（opt-in の CDP 接続を除く）。</p></div>
-  <div class="card"><h4>🧩 依存ゼロ</h4><p>Swift + AppKit + AVFoundation のみ。<code>swiftc</code> 一発でビルドでき、パッケージマネージャも Xcode プロジェクトも不要。</p></div>
+  <div class="card"><h4>🧩 依存ゼロ</h4><p>Swift + AppKit + UserNotifications のみ。<code>swiftc</code> 一発でビルドでき、パッケージマネージャも Xcode プロジェクトも不要。</p></div>
   <div class="card"><h4>⏱ 1 秒ポーリング</h4><p>FSEvents ではなく単純なポーリング + 差分 tail。堅牢でデバッグしやすく、消費リソースも無視できる規模（stat 数百回/秒以下）。</p></div>
   <div class="card"><h4>🎭 セッション = Brain</h4><p>セッションごとに独立した状態マシン（PetBrain）を持ち、メインの Clawn は「直近アクティブなセッション」を実況する。</p></div>
 </div>
@@ -180,12 +180,12 @@
   <text x="582" y="254" fill="var(--coral-dark)" font-size="12" font-weight="bold">SessionTrack × N</text>
   <text x="582" y="276" fill="var(--ink)" font-size="11">PetBrain（状態マシン）を 1 個ずつ</text>
   <text x="582" y="294" fill="var(--ink)" font-size="11">mood / statusLine / lastEvent</text>
-  <text x="582" y="312" fill="var(--sub)" font-size="11">最大 6 セッション追跡</text>
+  <text x="582" y="312" fill="var(--sub)" font-size="11">最大 12 追跡（カード 6 枚 + +N チップ）</text>
   <!-- View & Notifier -->
   <rect x="290" y="370" width="240" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
   <text x="302" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">PetView（AppKit / 30fps）</text>
   <text x="302" y="414" fill="var(--ink)" font-size="11">メイン Clawn + バッジ</text>
-  <text x="302" y="432" fill="var(--ink)" font-size="11">セッションカード / ミニ表示</text>
+  <text x="302" y="432" fill="var(--ink)" font-size="11">セッションカード / +N チップ / ˅</text>
   <rect x="570" y="370" width="230" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
   <text x="582" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">Notifier</text>
   <text x="582" y="414" fill="var(--ink)" font-size="11">通知センター（応答到着）</text>
@@ -201,7 +201,7 @@
   <line x1="640" y1="330" x2="480" y2="368" stroke="var(--sub)" marker-end="url(#arr)"/>
   <text x="470" y="352" fill="var(--sub)" font-size="10">PetStatus / SessionCard</text>
   <line x1="700" y1="330" x2="700" y2="368" stroke="var(--sub)" marker-end="url(#arr)"/>
-  <text x="708" y="352" fill="var(--sub)" font-size="10">onSpeak</text>
+  <text x="708" y="352" fill="var(--sub)" font-size="10">notifyReply</text>
 </svg>
 <figcaption>データフロー: ローカルファイル → Watchers → Router → セッションごとの PetBrain → 描画/通知</figcaption>
 </figure>
@@ -226,7 +226,7 @@
 <table>
 <tr><th>ファイル</th><th>責務</th><th>主な型</th></tr>
 <tr><td><code>main.swift</code></td><td>エントリポイント。<code>NSApplication</code> を accessory（Dock 非表示）で起動</td><td>—</td></tr>
-<tr><td><code>PetCore.swift</code></td><td>ドメイン層。イベント定義・セッションごとの状態マシン・表示/発話文言の生成</td><td><code>PetEvent</code> <code>PetMood</code> <code>PetBrain</code> <code>SessionCard</code></td></tr>
+<tr><td><code>PetCore.swift</code></td><td>ドメイン層。イベント定義・セッションごとの状態マシン・表示文言の生成</td><td><code>PetEvent</code> <code>PetMood</code> <code>PetBrain</code> <code>SessionCard</code></td></tr>
 <tr><td><code>Watchers.swift</code></td><td>ファイル監視層。差分 tail（ローテーション対応）と JSONL / ログのパース</td><td><code>TailReader</code> <code>PollingWatcher</code> と各 Watcher</td></tr>
 <tr><td><code>PetView.swift</code></td><td>描画層。Clawn 本体（全モーション）・セッションカード・開閉コントロール（バッジ / ˅）・クリック/ドラッグ判定</td><td><code>PetView</code></td></tr>
 <tr><td><code>Notifier.swift</code></td><td>応答到着の通知センター連携。<code>UNUserNotificationCenter</code> → 許可が下りない環境は <code>osascript</code> にフォールバック。通知タップでセッションジャンプ</td><td><code>Notifier</code></td></tr>
@@ -305,7 +305,7 @@
 <ul class="notes">
   <li><b>primary 選定:</b> <code>lastEvent</code> が最新の Track がメインの Clawn を駆動する。セッションが 1 つもない時は <code>defaultBrain</code>（挨拶用）を表示。</li>
   <li><b>pending prompt 昇格:</b> <code>history.jsonl</code> のプロンプトは transcript より先に届くことがある。未知の sessionId なら 15 秒だけ保留し、transcript 側の <code>userMessage</code> が来た瞬間に本文付きの <code>userPrompt</code> へ昇格させる。これで新規セッションの 1 通目から本文をカード表示・通知に使える。</li>
-  <li><b>prune:</b> 30 分イベントがない Track は破棄（カードも消える）。追跡は直近更新の transcript 最大 6 本。</li>
+  <li><b>prune:</b> 30 分イベントがない Track は破棄（カードも消える）。追跡は直近更新の transcript 最大 12 本（カード表示は 6 枚、超過分は +N チップ）。</li>
   <li><b>Desktop イベント:</b> <code>main.log</code> の sessionId（<code>local_*</code>）は transcript の sessionId と対応しないため、primary Track に配送する。</li>
   <li><b>サブエージェント:</b> <code>isSidechain: true</code> の行はツール実行のみ拾い、「(サブエージェント)」の接頭辞を付ける。</li>
   <li><b>セッションへジャンプ:</b> カードクリックで <code>claude://resume?session=&lt;uuid&gt;</code> を開く。Claude Desktop が transcript からセッションを取り込み、該当セッションにフォーカスする（実測: <code>Imported CLI session … / setFocusedSession</code>）。パラメータ名が <code>session</code> であることは app.asar のディープリンクハンドラから特定した。</li>
@@ -319,7 +319,7 @@
   <g font-size="11">
     <!-- open: cards + close button + crab -->
     <rect x="30" y="16" width="200" height="268" rx="10" fill="none" stroke="var(--coral)" stroke-width="1.5"/>
-    <text x="130" y="8" text-anchor="middle" fill="var(--sub)" font-size="10.5">ひらく（260 × 146+54n）</text>
+    <text x="130" y="8" text-anchor="middle" fill="var(--sub)" font-size="10.5">ひらく（260 × 142+54n）</text>
     <rect x="42" y="28" width="176" height="40" rx="12" fill="var(--code-bg)" stroke="var(--coral)" stroke-width="1.4"/>
     <text x="50" y="52" fill="var(--ink)">🦀 カード1（primary 強調枠）</text>
     <rect x="42" y="74" width="176" height="40" rx="12" fill="var(--code-bg)" stroke="var(--line)"/>
@@ -376,7 +376,7 @@
 <tr><td><code>CLAWN_WATCH_DIR</code> / <code>CLAWN_HISTORY</code> / <code>CLAWN_MAINLOG</code></td><td>監視パスの差し替え。フェイク JSONL を append して全遷移を再現テストできる</td></tr>
 <tr><td><code>SIGUSR1</code></td><td>ペットの現在の見た目を PNG に自己レンダリング（<code>CLAWN_SNAPSHOT_PATH</code>）。スクリーンショット権限不要の自己検証手段</td></tr>
 <tr><td><code>SIGUSR2</code> / メニュー「デモ再生」</td><td>プロンプト→ツール実行→応答→片付けの全モーションを順に再生</td></tr>
-<tr><td>メニュー「こえテスト」</td><td>現在のエンジンで 1 フレーズ発話</td></tr>
+<tr><td><code>CLAWN_TEST_FACING</code></td><td>向き演出を固定（<code>1</code>=右向き / <code>-1</code>=左向き）。スナップショットと組み合わせて見た目検証</td></tr>
 </table>
 <div class="callout">🧪 <b>開発時の実績:</b> フェイクイベントでの全遷移テスト → 実環境で開発セッション自身のツール実行を 1 秒以内に検知することを確認、という 2 段構えで検証。詳細は <code>docs/FEASIBILITY.md</code>。</div>
 </section>
@@ -384,15 +384,16 @@
 <section id="limits">
 <h2>10. 制約と拡張ポイント</h2>
 <ul class="notes">
-  <li><b>claude.ai Web チャット未対応:</b> Desktop 内のブラウザチャットはローカルにメッセージを書き出さない。残る道は CDP（<code>--remote-debugging-port</code>）で、実行中はシングルトンロックのため検証不可だった。検証手順と設計案は FEASIBILITY.md の CDP 章を参照。</li>
+  <li><b>claude.ai Web チャットは opt-in:</b> Desktop 内のブラウザチャットはローカルにメッセージを書き出さないため、<code>CLAWN_CDP_PORT</code> 指定時のみ CDPWatcher が接続する（§3）。本文は取れず「考え中 → 応答完了」の粒度。デバッグポートはローカル全プロセスから接続可能になるため常用は非推奨。</li>
   <li><b>assistant 本文はブロック確定単位:</b> トークン単位のストリーミング途中経過は transcript に書かれない。</li>
   <li><b>スケジュールタスク名は取れない:</b> <code>main.log</code> にはライフサイクル（Initialized 等）しか出ず、タスク名はサーバー側。</li>
-  <li><b>拡張案:</b> CDP ウォッチャー（opt-in）/ カードクリックでプロジェクトを開く / 応答完了の通知センター連携 / セッションごとの担当ボイス切替。</li>
+  <li><b>ad-hoc 署名:</b> Developer ID 署名・公証をしていないため、配布先マシンでは Gatekeeper の回避操作が要る。通知センターの許可が下りない環境があるのも同根（osascript フォールバックで吸収）。</li>
+  <li><b>拡張案:</b> GitHub Releases での配布（要署名・公証）/ ログイン項目への自動登録 / 表示文言・寝るまでの時間のカスタマイズ / +N チップのクリックで全カード展開。</li>
 </ul>
 </section>
 
 <footer>
-  🦀 ClawnPet v0.2 — 2026-07-14 ・ MIT License ・ 非公式プロジェクト（Anthropic とは無関係です）
+  🦀 ClawnPet v0.4 — 2026-07-14 ・ MIT License ・ 非公式プロジェクト（Anthropic とは無関係です）
 </footer>
 
 </div>
