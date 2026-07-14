@@ -107,6 +107,17 @@ narrated at "thinking → done" granularity (message bodies aren't available).
 
 Signals: `SIGUSR1` = save a PNG snapshot of the pet, `SIGUSR2` = toggle demo.
 
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/architecture.html](docs/architecture.html) | Design doc — architecture diagrams, state machine, UI layout, why AppKit (Japanese) |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev guide — build, deploy, fake-session test recipes, icon regeneration (Japanese) |
+| [docs/PITFALLS.md](docs/PITFALLS.md) | 12 pitfalls we actually hit, with fixes (Japanese) |
+| [docs/FEASIBILITY.md](docs/FEASIBILITY.md) | Signal-source research report (Japanese) |
+| [CHANGELOG.md](CHANGELOG.md) | Version history (Japanese) |
+| [CLAUDE.md](CLAUDE.md) | Working guide for AI agents (Japanese) |
+
 ## Uninstall
 
 Menu bar 🦀 → "Quit Clawn", then delete `/Applications/ClawnPet.app`.
@@ -117,10 +128,14 @@ Menu bar 🦀 → "Quit Clawn", then delete `/Applications/ClawnPet.app`.
 ```
 Sources/ClawnPet/
 ├── main.swift         # entry point
-├── AppDelegate.swift  # window / menu bar / timers / demo / signals
+├── AppDelegate.swift  # window / routing / menu bar / timers / signals
 ├── PetCore.swift      # PetEvent / PetBrain (state machine)
-├── PetView.swift      # drawing, animation, session cards
-└── Watchers.swift     # TailReader + transcript / history / main.log watchers
+├── PetView.swift      # drawing, animation, cards, badge / ˅ controls
+├── Watchers.swift     # TailReader + transcript / history / main.log / registry watchers
+├── Notifier.swift     # Notification Center bridge (osascript fallback)
+└── CDPWatcher.swift   # claude.ai web chat watcher (opt-in)
+tools/
+└── render_icon.swift  # renders the app icon from code
 ```
 
 ## License
