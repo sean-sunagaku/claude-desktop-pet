@@ -1,37 +1,37 @@
-# ClawnPet — ビルド・導入・開発用コマンド
+# Claude Pet — ビルド・導入・開発用コマンド
 # `make help` でターゲット一覧を表示
 
-APP     = build/ClawnPet.app
-DEST    = /Applications/ClawnPet.app
-ICONSET = build/ClawnPet.iconset
+APP     = build/ClaudePet.app
+DEST    = /Applications/ClaudePet.app
+ICONSET = build/ClaudePet.iconset
 
 .PHONY: help build install restart run uninstall icon clean
 
 help: ## ターゲット一覧を表示
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
-build: ## ビルドして build/ClawnPet.app を作る（要 Xcode Command Line Tools）
+build: ## ビルドして build/ClaudePet.app を作る（要 Xcode Command Line Tools）
 	./build.sh
 
 install: build ## ビルドして /Applications に配置・起動（常駐版の導入と更新）
-	-pkill -f ClawnPet 2>/dev/null; sleep 0.5
-	rm -rf $(DEST)
+	-pkill -f "ClawnPet|ClaudePet" 2>/dev/null; sleep 0.5
+	rm -rf $(DEST) /Applications/ClawnPet.app
 	cp -R $(APP) $(DEST)
 	touch $(DEST)
 	open $(DEST)
 	@echo "Installed: $(DEST)"
 
 restart: ## 常駐版（/Applications）を再起動
-	-pkill -f ClawnPet 2>/dev/null; sleep 0.5
+	-pkill -f "ClawnPet|ClaudePet" 2>/dev/null; sleep 0.5
 	open $(DEST)
 
 run: build ## その場でデバッグ起動（CLAWN_DEBUG=1・フォアグラウンド・Ctrl-C で終了）
-	-pkill -f ClawnPet 2>/dev/null; sleep 0.5
-	CLAWN_DEBUG=1 $(APP)/Contents/MacOS/ClawnPet
+	-pkill -f "ClawnPet|ClaudePet" 2>/dev/null; sleep 0.5
+	CLAWN_DEBUG=1 $(APP)/Contents/MacOS/ClaudePet
 
 uninstall: ## 常駐を停止して /Applications と設定（UserDefaults）を削除
-	-pkill -f ClawnPet 2>/dev/null
-	rm -rf $(DEST)
+	-pkill -f "ClawnPet|ClaudePet" 2>/dev/null
+	rm -rf $(DEST) /Applications/ClawnPet.app
 	-defaults delete com.sunagaku.clawnpet 2>/dev/null || true
 	@echo "Uninstalled."
 

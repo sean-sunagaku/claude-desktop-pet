@@ -10,11 +10,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build ClawnPet.app
+      - name: Build ClaudePet.app
         run: ./build.sh
       - name: Zip app bundle
-        run: ditto -c -k --keepParent build/ClawnPet.app ClawnPet.zip
+        run: ditto -c -k --keepParent build/ClaudePet.app ClaudePet.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: ClawnPet
-          path: ClawnPet.zip
+          name: ClaudePet
+          path: ClaudePet.zip

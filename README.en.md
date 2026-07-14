@@ -1,4 +1,4 @@
-# 🦀 ClawnPet — A Desktop Pet for Claude
+# 🦀 Claude Pet — A Desktop Pet for Claude
 
 **日本語版 → [README.md](README.md)**
 
@@ -25,7 +25,7 @@ inspired by "desktop pet" companions, built for Claude.
 - **Faces where it's going** — while dragged, Clawn leans into the direction of travel and its eyes follow; it settles back to front when you stop
 - **The crab never changes size** — same structure as ChatGPT's desktop pet: open or closed, the mascot stays 116×112. **Click the badge (session count) to unfold the cards above it**, and **click the ˅ button over its head to close them**. The badge is orange while working, green otherwise; watching and notifications continue while closed
 - **Reply notifications** — finished responses also land in Notification Center; clicking one jumps to that session
-- **claude.ai web chat support (opt-in)** — launch Claude Desktop with a debug port and ClawnPet narrates web-chat sends/completions too, via CDP
+- **claude.ai web chat support (opt-in)** — launch Claude Desktop with a debug port and Claude Pet narrates web-chat sends/completions too, via CDP
 - Falls asleep after 8 quiet minutes; wakes on the next event
 - Works with **every Claude Code session on your machine**: Claude Desktop (CCD), CLI,
   IDE extensions — plus Claude Desktop's own send events
@@ -87,13 +87,13 @@ back to `osascript` notifications automatically.
 
 ### claude.ai web chat (opt-in, CDP)
 
-Launch Claude Desktop with a remote-debugging port and ClawnPet will narrate
+Launch Claude Desktop with a remote-debugging port and Claude Pet will narrate
 web chat activity too (send → streaming → done):
 
 ```bash
 osascript -e 'quit app "Claude"'; sleep 2
 open -a Claude --args --remote-debugging-port=9222
-CLAWN_CDP_PORT=9222 open -n /Applications/ClawnPet.app
+CLAWN_CDP_PORT=9222 open -n /Applications/ClaudePet.app
 ```
 
 Without `CLAWN_CDP_PORT` the CDP watcher stays off (default). Web chat is
@@ -125,7 +125,7 @@ Signals: `SIGUSR1` = save a PNG snapshot of the pet, `SIGUSR2` = toggle demo.
 
 ## Uninstall
 
-Menu bar 🦀 → "Quit Clawn", then delete `/Applications/ClawnPet.app`.
+Menu bar 🦀 → "Claude Pet を終了" (Quit), then delete `/Applications/ClaudePet.app`.
 (The only persisted state is the window position in UserDefaults.)
 
 ## Project layout

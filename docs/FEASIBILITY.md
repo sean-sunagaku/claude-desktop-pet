@@ -102,7 +102,7 @@ curl -s http://127.0.0.1:9333/json/list | python3 -m json.tool | head -30
 - Swift からは `URLSessionWebSocketTask` で直接喋れる（依存ライブラリ不要）
 
 **リスク**: デバッグポートはローカルの全プロセスから接続できるため常時有効化は非推奨。
-ClawnPet に組み込むなら「ポートが開いていれば使う」opt-in 設計が適切。
+Claude Pet に組み込むなら「ポートが開いていれば使う」opt-in 設計が適切。
 
 ## 実装した MVP のアーキテクチャ
 

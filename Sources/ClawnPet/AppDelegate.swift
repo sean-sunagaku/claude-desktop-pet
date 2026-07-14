@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let v = ProcessInfo.processInfo.environment["CLAWN_SET_AUTOSTART"] {
             setAutostart(v == "on" || v == "1")
         }
-        log("ClawnPet started (pid \(ProcessInfo.processInfo.processIdentifier), autostart=\(Self.autostartEnabled))")
+        log("Claude Pet started (pid \(ProcessInfo.processInfo.processIdentifier), autostart=\(Self.autostartEnabled))")
     }
 
     private func setupWindow() {
@@ -261,7 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(withTitle: "スナップショット保存", action: #selector(saveSnapshot), keyEquivalent: "s").target = self
         menu.addItem(withTitle: "位置をリセット", action: #selector(resetPosition), keyEquivalent: "r").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Clawn を終了", action: #selector(quit), keyEquivalent: "q").target = self
+        menu.addItem(withTitle: "Claude Pet を終了", action: #selector(quit), keyEquivalent: "q").target = self
         item.menu = menu
         statusItem = item
     }

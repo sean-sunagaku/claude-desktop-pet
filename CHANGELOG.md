@@ -5,6 +5,10 @@
 
 ## v0.5 — 導入コマンドと常駐運用の整備
 
+- **アプリ名を「Claude Pet」に改名**。.app / 実行ファイルは `ClaudePet`（スペース回避）、
+  ウィンドウ owner 名は「Claude Pet」。bundle id・`CLAWN_*` 環境変数・`clawn.*` defaults・
+  ソースディレクトリは互換性のため旧名のまま。キャラクター名は「Clawn くん」で継続
+
 - Makefile 追加: `make install` / `run` / `restart` / `uninstall` / `icon` / `clean`（`abea5f5`）
 - 🦀 メニューに「ログイン時に起動」トグル（`SMAppService`。BTM 登録・解除を実機検証済み）
 - `tools/watch_resources.sh`: 長時間稼働のリソース観測用 CSV レコーダー

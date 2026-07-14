@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClawnPet アーキテクチャ &amp; 実装ドキュメント</title>
+<title>Claude Pet アーキテクチャ &amp; 実装ドキュメント</title>
 <style>
   :root {
     --bg: #FFF8F2;
@@ -104,7 +104,7 @@
 <div class="wrap">
 
 <header class="hero">
-  <h1><span class="crab">🦀</span> ClawnPet アーキテクチャ &amp; 実装ドキュメント</h1>
+  <h1><span class="crab">🦀</span> Claude Pet アーキテクチャ &amp; 実装ドキュメント</h1>
   <p>Claude Desktop / Claude Code の作業をローカルファイル監視だけでリアルタイム実況する macOS デスクトップペットの設計資料</p>
   <div class="meta">v0.4 ・ 2026-07-14 ・ Swift / AppKit（依存ライブラリゼロ）・ <a href="https://github.com/sean-sunagaku/claude-desktop-pet" style="color:#FFE9DC">GitHub: sean-sunagaku/claude-desktop-pet</a></div>
 </header>
@@ -125,7 +125,7 @@
 
 <section id="overview">
 <h2>1. 概要と設計原則</h2>
-<p>ClawnPet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・セッションカードで実況するアプリです。</p>
+<p>Claude Pet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・セッションカードで実況するアプリです。</p>
 <div class="cards">
   <div class="card"><h4>📖 読み取りのみ</h4><p>Claude アプリが元々ローカルに書き出すファイルを tail するだけ。ネットワーク送信・プロセス介入・UI 自動操作は一切しない（opt-in の CDP 接続を除く）。</p></div>
   <div class="card"><h4>🧩 依存ゼロ</h4><p>Swift + AppKit + UserNotifications のみ。<code>swiftc</code> 一発でビルドでき、パッケージマネージャも Xcode プロジェクトも不要。</p></div>
@@ -394,7 +394,7 @@
 </section>
 
 <footer>
-  🦀 ClawnPet v0.4 — 2026-07-14 ・ MIT License ・ 非公式プロジェクト（Anthropic とは無関係です）
+  🦀 Claude Pet v0.4 — 2026-07-14 ・ MIT License ・ 非公式プロジェクト（Anthropic とは無関係です）
 </footer>
 
 </div>
