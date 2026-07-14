@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var tracks: [String: SessionTrack] = [:]
     private var pendingPrompts: [String: (String, Date)] = [:] // sessionId -> (text, at)
     private let speech = SpeechManager()
+    private let notifier = Notifier()
+    private var cdpWatcher: CDPWatcher?
 
     private var animTimer: Timer?
     private var brainTimer: Timer?
@@ -33,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusMenuInfoItem: NSMenuItem?
     private var voiceMenuItems: [NSMenuItem] = []
     private var collapseMenuItem: NSMenuItem?
+    private var perProjectVoiceItem: NSMenuItem?
+    private var notifyMenuItem: NSMenuItem?
 
     private var demoTimer: Timer?
     private var demoIndex = 0
@@ -49,7 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private var collapsed: Bool {
-        get { UserDefaults.standard.bool(forKey: "clawn.collapsed") }
+        // デフォルトはミニ表示。クリックで展開したときだけカード等のフル表示になる
+        get { UserDefaults.standard.object(forKey: "clawn.collapsed") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "clawn.collapsed") }
     }
 
@@ -67,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         startTimers()
         wireBrain(defaultBrain, track: nil)
 
+        notifier.onOpenSession = { [weak self] sid in self?.openSession(sid) }
+        notifier.bootstrap()
         speech.checkVoicevox { [weak self] ok in self?.log("VOICEVOX alive=\(ok)") }
 
         if ProcessInfo.processInfo.environment["CLAWN_DEMO"] == "1" {
@@ -142,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if self.tracks.count >= 2, let t = track {
                 prefix = "\(t.project ?? "セッション")、"
             }
-            self.speech.speak(prefix + text, interrupt: interrupt)
+            self.speech.speak(prefix + text, interrupt: interrupt, project: track?.project)
         }
     }
 
@@ -180,6 +187,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         } else {
             t.brain.handle(event)
         }
+
+        // 応答到着は通知センターにも出す（Web チャットの汎用文言は除く）
+        if case .assistantText(let snippet, let project) = event, snippet != "Web チャットの応答が完了" {
+            notifier.notifyReply(project: project ?? t.project, snippet: snippet,
+                                 sessionId: sessionId.hasPrefix("web") ? nil : sessionId)
+        }
         applyStatus()
     }
 
@@ -211,10 +224,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let uuidRegex = try! NSRegularExpression(
         pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
-    /// claude://resume?session=<uuid> で Claude Desktop 上にそのセッションを開く
     private func jumpToSession(index: Int) {
         guard index < cardOrder.count else { return }
-        let sid = cardOrder[index]
+        openSession(cardOrder[index])
+    }
+
+    /// claude://resume?session=<uuid> で Claude Desktop 上にそのセッションを開く
+    private func openSession(_ sid: String) {
         let range = NSRange(sid.startIndex..., in: sid)
         guard uuidRegex.firstMatch(in: sid, range: range) != nil,
               let url = URL(string: "claude://resume?session=\(sid)") else {
@@ -251,6 +267,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             voiceMenuItems.append(mi)
         }
         voiceMenu.addItem(.separator())
+        let perProject = NSMenuItem(title: "セッションごとに声を変える", action: #selector(togglePerProjectVoice), keyEquivalent: "")
+        perProject.target = self
+        perProject.state = speech.perProjectVoice ? .on : .off
+        voiceMenu.addItem(perProject)
+        perProjectVoiceItem = perProject
         let test = NSMenuItem(title: "こえテスト", action: #selector(voiceTest), keyEquivalent: "")
         test.target = self
         voiceMenu.addItem(test)
@@ -262,6 +283,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         collapse.target = self
         menu.addItem(collapse)
         collapseMenuItem = collapse
+
+        let notify = NSMenuItem(title: "返信を通知センターに出す", action: #selector(toggleNotify), keyEquivalent: "")
+        notify.target = self
+        notify.state = notifier.enabled ? .on : .off
+        menu.addItem(notify)
+        notifyMenuItem = notify
 
         let cards = NSMenuItem(title: "セッションカード", action: #selector(toggleCards), keyEquivalent: "c")
         cards.target = self
@@ -305,6 +332,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         speech.checkVoicevox { [weak self] _ in
             self?.speech.speak("こんにちは！クラウンだよ！きょうも いっしょに がんばろうね", interrupt: true)
         }
+    }
+
+    @objc private func togglePerProjectVoice() {
+        speech.perProjectVoice.toggle()
+        perProjectVoiceItem?.state = speech.perProjectVoice ? .on : .off
+        speech.speak(speech.perProjectVoice ? "セッションごとに 声を変えるね！" : "声を そろえるね", interrupt: true)
+    }
+
+    @objc private func toggleNotify() {
+        notifier.enabled.toggle()
+        notifyMenuItem?.state = notifier.enabled ? .on : .off
     }
 
     @objc private func toggleCards() {
@@ -368,6 +406,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
         sessionsTimer?.fire()
+
+        // CDP（Web チャット監視）: CLAWN_CDP_PORT が指定されていれば有効化（opt-in）
+        let cdpPort = Int(env["CLAWN_CDP_PORT"] ?? "") ?? 0
+        if cdpPort > 0 {
+            let w = CDPWatcher(port: cdpPort) { [weak self] sid, event in self?.routeTranscript(sid, event) }
+            w.start()
+            cdpWatcher = w
+            log("CDP watcher enabled on port \(cdpPort)")
+        }
     }
 
     // MARK: - タイマー
@@ -427,6 +474,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         petView.cardsVisible = cardsOn
         petView.collapsed = collapsed
+        petView.sessionCount = tracks.count
 
         if let reg = registry, reg.aliveCount > 0 {
             petView.sessionsInfo = "session ×\(reg.aliveCount)"

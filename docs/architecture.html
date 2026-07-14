@@ -216,6 +216,7 @@
 <tr><td><code>~/.claude/history.jsonl</code></td><td>全セッション横断のユーザープロンプト本文 + project + sessionId</td><td>送信瞬間</td><td>HistoryWatcher</td></tr>
 <tr><td><code>~/Library/Logs/Claude/main.log</code></td><td>Claude Desktop の <code>LocalSessions.sendMessage</code>（文字数付き）、セッション pause、ウィンドウフォーカス</td><td>即時</td><td>DesktopLogWatcher</td></tr>
 <tr><td><code>~/.claude/sessions/&lt;pid&gt;.json</code></td><td>稼働中セッションのレジストリ {pid, sessionId, cwd, name}。pid 生存確認で現役判定</td><td>数秒</td><td>SessionsRegistry</td></tr>
+<tr><td><code>ws://127.0.0.1:&lt;port&gt;</code>（CDP / opt-in）</td><td>claude.ai Web チャットの completion リクエストのライフサイクル（送信→ストリーミング→完了）。<code>CLAWN_CDP_PORT</code> 指定時のみ有効</td><td>即時</td><td>CDPWatcher</td></tr>
 </table>
 <div class="callout">💡 <b>transcript の要点:</b> <code>content</code> が文字列（または <code>{type:"text"}</code> 配列）の user 行が人間の発話。<code>tool_result</code> を含む user 行はエージェントの継続実行。<code>isMeta: true</code> と <code>&lt;</code> 始まりのテキスト（<code>&lt;command-name&gt;</code> 等）はシステム由来なので除外する。</div>
 </section>
@@ -229,6 +230,8 @@
 <tr><td><code>Watchers.swift</code></td><td>ファイル監視層。差分 tail（ローテーション対応）と JSONL / ログのパース</td><td><code>TailReader</code> <code>PollingWatcher</code> と各 Watcher</td></tr>
 <tr><td><code>Speech.swift</code></td><td>音声実況。VOICEVOX HTTP API とシステム音声の切替・レート制限</td><td><code>SpeechManager</code></td></tr>
 <tr><td><code>PetView.swift</code></td><td>描画層。Clawn 本体（全モーション）・吹き出し・セッションカード・ミニ表示・クリック/ドラッグ判定</td><td><code>PetView</code></td></tr>
+<tr><td><code>Notifier.swift</code></td><td>応答到着の通知センター連携。<code>UNUserNotificationCenter</code> → 許可が下りない環境は <code>osascript</code> にフォールバック。通知タップでセッションジャンプ</td><td><code>Notifier</code></td></tr>
+<tr><td><code>CDPWatcher.swift</code></td><td>claude.ai Web チャット監視（opt-in）。<code>/json</code> でページ探索 → WebSocket で Network ドメイン購読</td><td><code>CDPWatcher</code></td></tr>
 <tr><td><code>AppDelegate.swift</code></td><td>結線。ウィンドウ管理（伸縮）・イベントルーティング・メニューバー・デモ・シグナル</td><td><code>AppDelegate</code> <code>SessionTrack</code></td></tr>
 <tr><td><code>tools/render_icon.swift</code></td><td>アプリアイコンをコードから描画して PNG 出力（<code>build</code> 時ではなく手動再生成）</td><td>—</td></tr>
 </table>
@@ -345,8 +348,8 @@
       <text x="480" y="88">・ドラッグ移動（3px 超で performDrag）</text>
       <text x="480" y="112">・クリック = 開閉（250ms 待ってダブルと判別）</text>
       <text x="480" y="136">・ダブルクリック = なでる 🎉</text>
-      <text x="480" y="160">・ミニ表示は 0.52 倍描画 + 気分バッジ</text>
-      <text x="480" y="184">・ミニでも監視と音声実況は継続</text>
+      <text x="480" y="160">・デフォルトはミニ。0.52 倍描画 + セッション数バッジ</text>
+      <text x="480" y="184">・バッジ色 = 気分（作業中オレンジ / ふだん緑）。ミニでも監視・実況は継続</text>
       <text x="480" y="208">・カードはアクティブセッション数だけ積む</text>
       <text x="480" y="232">・位置/開閉/音声設定は UserDefaults に永続化</text>
     </g>
@@ -363,7 +366,9 @@
   <li><b>VOICEVOX API フロー:</b> <code>POST /audio_query?speaker=3&amp;text=…</code> → 返ってきた JSON をそのまま <code>POST /synthesis?speaker=3</code> へ → WAV を <code>AVAudioPlayer</code> で再生。</li>
   <li><b>レート制限:</b> 通常発話は 7 秒間隔。応答到着（celebrating）だけは割り込みフラグ付きで必ず喋る。</li>
   <li><b>マルチセッション時:</b> 2 セッション以上追跡中はプロジェクト名を接頭辞に付ける（「pet、へんじがきたよ！」）。</li>
+  <li><b>セッションごとの声:</b> 「セッションごとに声を変える」ON でプロジェクト名のハッシュから VOICEVOX のインストール済み話者を安定的に割り当て（同じプロジェクトは常に同じ声）。</li>
   <li><b>死活監視:</b> 30 秒ごとに <code>GET /version</code>（タイムアウト 1.2 秒）で VOICEVOX の生存確認。</li>
+  <li><b>通知センター:</b> 応答到着は <code>Notifier</code> 経由で macOS 通知にも出せる（4 秒レート制限、通知タップで <code>claude://resume</code> ジャンプ）。</li>
 </ul>
 </section>
 

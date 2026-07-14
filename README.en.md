@@ -23,7 +23,10 @@ inspired by "desktop pet" companions, built for Claude.
 - **Session cards** — stacks up to 6 active sessions as cards, each with a mini crab showing that session's mood
 - **Click a card to jump to that session** — opens it in Claude Desktop via the `claude://resume` deep link
 - **Voice narration** — VOICEVOX (Zundamon) or the macOS system voice reads out events in real time (switchable / off in the menu)
-- **Click to collapse** — one click folds Clawn into a tiny 116×112 buddy; watching and narration continue
+- **Mini by default** — Clawn starts as a tiny 116×112 buddy. A badge on its shoulder shows the number of active sessions (orange while working, green otherwise). Click to expand into the full view with session cards, click again to shrink back; watching, narration and notifications continue while mini
+- **A different voice per session** — VOICEVOX speakers are auto-assigned per project, so you can tell sessions apart by ear
+- **Reply notifications** — finished responses also land in Notification Center; clicking one jumps to that session
+- **claude.ai web chat support (opt-in)** — launch Claude Desktop with a debug port and ClawnPet narrates web-chat sends/completions too, via CDP
 - Falls asleep after 8 quiet minutes; wakes on the next event
 - Works with **every Claude Code session on your machine**: Claude Desktop (CCD), CLI,
   IDE extensions — plus Claude Desktop's own send events
@@ -48,7 +51,7 @@ Auto-start at login: System Settings → General → Login Items → add ClawnPe
 
 | Action | Result |
 |---|---|
-| Click | Collapse / expand (mini mode) |
+| Click | Expand / collapse (mini by default) |
 | Click a session card | Open that session in Claude Desktop |
 | Drag | Move it anywhere (position is remembered) |
 | Double-click | Pet it (it celebrates) |
@@ -75,6 +78,31 @@ notes (including what *didn't* work and the CDP path for claude.ai web chat) are
 If [VOICEVOX](https://voicevox.hiroshiba.jp/) is running (`localhost:50021`),
 Zundamon narrates your sessions; otherwise ClawnPet falls back to the macOS
 system voice. Switch engines (or mute) from the 🦀 menu bar icon.
+Turn on "セッションごとに声を変える" (per-session voice) and ClawnPet
+auto-assigns an installed VOICEVOX speaker to each project, so you can tell
+who's talking without looking.
+
+### Reply notifications
+
+Finished responses can also be posted to Notification Center
+(🦀 menu → "返信を通知センターに出す"). Clicking a notification jumps to that
+session. Ad-hoc builds that macOS refuses notification permission for fall
+back to `osascript` notifications automatically.
+
+### claude.ai web chat (opt-in, CDP)
+
+Launch Claude Desktop with a remote-debugging port and ClawnPet will narrate
+web chat activity too (send → streaming → done):
+
+```bash
+osascript -e 'quit app "Claude"'; sleep 2
+open -a Claude --args --remote-debugging-port=9222
+CLAWN_CDP_PORT=9222 open -n /Applications/ClawnPet.app
+```
+
+Without `CLAWN_CDP_PORT` the CDP watcher stays off (default). Web chat is
+narrated at "thinking → done" granularity (message bodies aren't available).
+> ⚠️ A debug port is reachable by every local process — not recommended for daily use.
 
 ## Debugging
 

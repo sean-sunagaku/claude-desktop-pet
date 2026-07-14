@@ -11,6 +11,7 @@ final class PetView: NSView {
     var sessionCards: [SessionCard] = []
     var cardsVisible = true
     var collapsed = false
+    var sessionCount = 0 // ミニ表示バッジ用のアクティブセッション数
 
     static let petAreaHeight: CGFloat = 320 // ペット+吹き出しの基本領域
     static let cardHeight: CGFloat = 48
@@ -147,8 +148,40 @@ final class PetView: NSView {
         drawExtras(cx: cx, y: baseY, phase: phase)
     }
 
-    /// ミニ表示時の気分バッジ（右上）
+    /// ミニ表示時の右上バッジ。
+    /// セッションがあれば数字バッジ（通知ドット風・気分で色が変わる）、なければ気分絵文字のみ。
     private func drawCollapsedBadge() {
+        let bobY = sin(t * 3) * 1.5
+        if sessionCount > 0 {
+            let color: NSColor
+            switch mood {
+            case .working, .thinking: color = NSColor(red: 0.94, green: 0.60, blue: 0.23, alpha: 1) // 作業中はオレンジ
+            case .sleeping:           color = NSColor(white: 0.58, alpha: 1)
+            default:                  color = NSColor(red: 0.18, green: 0.76, blue: 0.36, alpha: 1) // ふだんは緑
+            }
+            let d: CGFloat = 26
+            let rect = NSRect(x: Self.collapsedSize.width - d - 8, y: Self.collapsedSize.height - d - 4 + bobY,
+                              width: d, height: d)
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
+            shadow.shadowOffset = NSSize(width: 0, height: -1.5)
+            shadow.shadowBlurRadius = 3
+            shadow.set()
+            color.setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            NSGraphicsContext.restoreGraphicsState()
+
+            let label = sessionCount > 9 ? "9+" : "\(sessionCount)"
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: label.count > 1 ? 11 : 14, weight: .bold),
+                .foregroundColor: NSColor.white,
+            ]
+            let size = (label as NSString).size(withAttributes: attrs)
+            (label as NSString).draw(at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2),
+                                     withAttributes: attrs)
+            return
+        }
         let badge: String
         switch mood {
         case .thinking: badge = "💭"
@@ -157,7 +190,6 @@ final class PetView: NSView {
         case .sleeping: badge = "💤"
         case .idle: return
         }
-        let bobY = sin(t * 3) * 1.5
         (badge as NSString).draw(at: NSPoint(x: Self.collapsedSize.width - 30, y: Self.collapsedSize.height - 28 + bobY),
                                  withAttributes: [.font: NSFont.systemFont(ofSize: 15)])
     }

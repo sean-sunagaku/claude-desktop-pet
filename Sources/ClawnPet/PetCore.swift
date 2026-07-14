@@ -158,6 +158,7 @@ final class PetBrain {
 
     static func toolLabel(_ name: String) -> String {
         switch name {
+        case "__web_completion__": return "Web チャットで考え中"
         case "Bash": return "ターミナルで作業"
         case "Read": return "ファイルをよみよみ"
         case "Edit", "Write", "NotebookEdit": return "コードをカキカキ"

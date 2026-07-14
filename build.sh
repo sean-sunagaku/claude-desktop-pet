@@ -11,7 +11,7 @@ cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 swiftc -O -swift-version 5 \
   Sources/ClawnPet/*.swift \
   -o "$APP/Contents/MacOS/ClawnPet" \
-  -framework AppKit -framework AVFoundation
+  -framework AppKit -framework AVFoundation -framework UserNotifications
 
 codesign --force --sign - "$APP" 2>/dev/null || true
 echo "Built: $APP"
