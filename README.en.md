@@ -6,9 +6,9 @@ A native macOS desktop pet that lives outside the Claude Desktop window, watches
 your Claude sessions, and gives you a live play-by-play of what Claude is doing —
 inspired by "desktop pet" companions, built for Claude.
 
-| Idle | Thinking | Working | Reply arrived! |
-|---|---|---|---|
-| ![idle](docs/images/idle.png) | ![thinking](docs/images/1_thinking.png) | ![working](docs/images/2_working.png) | ![celebrating](docs/images/3_celebrating.png) |
+| Idle | Thinking | Working | Reply arrived! | Multi-session |
+|---|---|---|---|---|
+| ![idle](docs/images/idle.png) | ![thinking](docs/images/1_thinking.png) | ![working](docs/images/2_working.png) | ![celebrating](docs/images/3_celebrating.png) | ![sessions](docs/images/multi_sessions.png) |
 
 > **Unofficial project.** Not affiliated with or endorsed by Anthropic.
 > It only *reads* local files that Claude apps already write on your machine —
@@ -20,8 +20,11 @@ inspired by "desktop pet" companions, built for Claude.
 - **Detects when you send a message** and shows the prompt text in a speech bubble while "thinking"
 - **Narrates tool use in real time** — terminal work, code edits, web searches, sub-agents…
 - **Jumps and sparkles when the reply lands**, quoting the first line of the response
+- **Session cards** — stacks up to 6 active sessions as cards, each with a mini crab showing that session's mood
+- **Click a card to jump to that session** — opens it in Claude Desktop via the `claude://resume` deep link
+- **Voice narration** — VOICEVOX (Zundamon) or the macOS system voice reads out events in real time (switchable / off in the menu)
+- **Click to collapse** — one click folds Clawn into a tiny 116×112 buddy; watching and narration continue
 - Falls asleep after 8 quiet minutes; wakes on the next event
-- Shows how many Claude Code sessions are alive (`session ×N`)
 - Works with **every Claude Code session on your machine**: Claude Desktop (CCD), CLI,
   IDE extensions — plus Claude Desktop's own send events
 
@@ -45,9 +48,12 @@ Auto-start at login: System Settings → General → Login Items → add ClawnPe
 
 | Action | Result |
 |---|---|
+| Click | Collapse / expand (mini mode) |
+| Click a session card | Open that session in Claude Desktop |
 | Drag | Move it anywhere (position is remembered) |
 | Double-click | Pet it (it celebrates) |
-| Right-click / 🦀 menu bar icon | Menu: demo, snapshot, reset position, quit |
+| ▾ button | Show / hide session cards |
+| Right-click / 🦀 menu bar icon | Menu: voice engine, collapse, demo, quit, … |
 
 ## How it works (read-only, nothing leaves your machine)
 
@@ -58,10 +64,17 @@ Auto-start at login: System Settings → General → Login Items → add ClawnPe
 | `~/Library/Logs/Claude/main.log` | Claude Desktop send / session-pause events |
 | `~/.claude/sessions/*.json` | Registry of live sessions (with pid liveness check) |
 
-It auto-follows the most recently active transcript, so it narrates whichever
-session you are currently driving. The full investigation notes (including what
-*didn't* work and the CDP path for claude.ai web chat) are in
-[docs/FEASIBILITY.md](docs/FEASIBILITY.md) (Japanese).
+It follows up to 6 transcripts active within the last 30 minutes in parallel; the
+main Clawn narrates whichever session moved most recently. The full investigation
+notes (including what *didn't* work and the CDP path for claude.ai web chat) are in
+[docs/FEASIBILITY.md](docs/FEASIBILITY.md), and the design overview lives in
+[docs/architecture.html](docs/architecture.html) (both Japanese).
+
+### Voice narration (VOICEVOX)
+
+If [VOICEVOX](https://voicevox.hiroshiba.jp/) is running (`localhost:50021`),
+Zundamon narrates your sessions; otherwise ClawnPet falls back to the macOS
+system voice. Switch engines (or mute) from the 🦀 menu bar icon.
 
 ## Debugging
 

@@ -32,14 +32,26 @@ struct PetStatus {
     var contextLine: String = "Claude の作業を見守るね"
 }
 
-// MARK: - 状態マシン
+// MARK: - セッションカード表示用
+
+struct SessionCard {
+    let title: String       // プロジェクト名 or セッション名
+    let statusLine: String  // 現在の状態
+    let mood: PetMood
+    let ageText: String     // "たった今" "3分前" など
+    let isPrimary: Bool     // メインの Clawn が実況中のセッション
+}
+
+// MARK: - 状態マシン（セッションごとに 1 つ持つ）
 
 final class PetBrain {
     private(set) var status = PetStatus()
-    private var lastEventAt = Date()
+    private(set) var lastEventDate = Date()
     private var moodChangedAt = Date()
     private var thinkingSince: Date?
     var onChange: ((PetStatus) -> Void)?
+    /// (テキスト, 割り込み) — 音声実況。割り込み=true は再生中でも喋る
+    var onSpeak: ((String, Bool) -> Void)?
 
     // 調整パラメータ
     private let celebrateDuration: TimeInterval = 7
@@ -61,31 +73,36 @@ final class PetBrain {
     }
 
     func handle(_ event: PetEvent) {
-        lastEventAt = Date()
+        lastEventDate = Date()
         switch event {
         case .userPrompt(let text, let project):
             thinkingSince = Date()
             let t = Self.trim(text, 30)
             set(.thinking, "うーん、かんがえ中", projectTag(project) + "「\(t)」")
+            onSpeak?("\(Self.trim(text, 20))、かんがえちゅう！", false)
         case .userMessage(let project):
-            // history.jsonl 側が本文付きで拾うので、こちらは thinking への遷移だけ担保
             if status.mood != .thinking {
                 thinkingSince = Date()
                 set(.thinking, "うーん、かんがえ中", projectTag(project) + "メッセージを受けとったよ")
+                onSpeak?("かんがえちゅう！", false)
             }
         case .toolUse(let name, let project, let sidechain):
             thinkingSince = nil
             let label = Self.toolLabel(name)
             let sub = sidechain ? "(サブエージェント) " : ""
+            let entering = (status.mood != .working)
             set(.working, "\(label)中", sub + projectTag(project) + "カタカタ🦀")
+            if entering { onSpeak?("\(label)ちゅう！", false) }
         case .toolResult:
             break // working 継続
         case .assistantText(let snippet, let project):
             thinkingSince = nil
             set(.celebrating, "へんじが きたよ！", projectTag(project) + "「\(Self.trim(snippet, 32))」")
+            onSpeak?("へんじがきたよ！\(Self.trim(snippet, 26))", true)
         case .desktopSendMessage(let length):
             thinkingSince = Date()
             set(.thinking, "うーん、かんがえ中", "Desktop から \(length) 文字そうしん！")
+            onSpeak?("そうしんしたよ！かんがえちゅう", false)
         case .desktopSessionPaused:
             if status.mood == .working || status.mood == .thinking {
                 thinkingSince = nil
@@ -94,6 +111,7 @@ final class PetBrain {
         case .desktopWindowFocused:
             if status.mood == .sleeping {
                 set(.idle, "おはよう！", "Claude Desktop がひらいたよ")
+                onSpeak?("おはよう！", false)
             }
         case .sessionSwitch(let project):
             if let p = project, !p.isEmpty, status.mood == .idle || status.mood == .sleeping {
@@ -116,13 +134,14 @@ final class PetBrain {
                 set(.idle, "まったり中〜", "つぎのおしごと待ち")
             }
         case .idle:
-            if now.timeIntervalSince(lastEventAt) > sleepAfter {
+            if now.timeIntervalSince(lastEventDate) > sleepAfter {
                 set(.sleeping, "すやすや…", "イベントが来たら起きるよ")
+                onSpeak?("おやすみなさい", false)
             }
         case .sleeping, .working:
             // working は次のイベント（assistantText 等）で解除される
             // 長時間 working のまま止まった場合の保険
-            if status.mood == .working, now.timeIntervalSince(lastEventAt) > sleepAfter {
+            if status.mood == .working, now.timeIntervalSince(lastEventDate) > sleepAfter {
                 set(.idle, "あれ、おわったのかな？", "しばらく動きがないみたい")
             }
         }
@@ -157,5 +176,12 @@ final class PetBrain {
             }
             return "\(name) を実行"
         }
+    }
+
+    static func ageText(_ date: Date) -> String {
+        let s = Int(-date.timeIntervalSinceNow)
+        if s < 60 { return "たった今" }
+        if s < 3600 { return "\(s / 60)分前" }
+        return "\(s / 3600)時間前"
     }
 }

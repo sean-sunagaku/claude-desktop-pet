@@ -10,6 +10,8 @@
 	<string>com.sunagaku.clawnpet</string>
 	<key>CFBundleExecutable</key>
 	<string>ClawnPet</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

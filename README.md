@@ -12,9 +12,9 @@ macOS ネイティブのデスクトップペットです。ChatGPT Desktop の 
 > Claude アプリがローカルに書き出すファイルを**読むだけ**で動作し、
 > ネットワーク送信・アプリへの介入・自動操作は一切行いません。
 
-| 待機 | 考え中 | 作業中 | 返答が来た！ |
-|---|---|---|---|
-| ![idle](docs/images/idle.png) | ![thinking](docs/images/1_thinking.png) | ![working](docs/images/2_working.png) | ![celebrating](docs/images/3_celebrating.png) |
+| 待機 | 考え中 | 作業中 | 返答が来た！ | マルチセッション |
+|---|---|---|---|---|
+| ![idle](docs/images/idle.png) | ![thinking](docs/images/1_thinking.png) | ![working](docs/images/2_working.png) | ![celebrating](docs/images/3_celebrating.png) | ![sessions](docs/images/multi_sessions.png) |
 
 ## なにができる？
 
@@ -22,8 +22,11 @@ macOS ネイティブのデスクトップペットです。ChatGPT Desktop の 
 - **メッセージ送信を検知**して「かんがえ中」— 送ったプロンプトの本文を吹き出しに表示
 - **ツール実行を実況** — 「ターミナルで作業中」「コードをカキカキ中」などツール別の実況
 - **返答が来たらジャンプしてお祝い** — 応答本文の先頭を吹き出しに表示
+- **セッションカード** — アクティブな全セッション（最大6）をカードでスタック表示。ミニカニが各セッションの気分を映す
+- **カードをクリックでそのセッションへジャンプ** — `claude://resume` ディープリンクで Claude Desktop 上に該当セッションを開く
+- **音声実況** — VOICEVOX（ずんだもん）またはシステム音声で「へんじがきたよ！」等をリアルタイム読み上げ（メニューで OFF/切替）
+- **クリックで開閉** — ワンクリックでミニ Clawn（116×112）に折りたたみ。ミニ中も監視と音声実況は継続
 - **8分なにもないと寝る**（イベントが来たら起きる）
-- 稼働中の Claude Code セッション数を表示（`session ×N`）
 - 対象: **Claude Desktop 内の Claude Code（CCD）/ CLI / Cursor 拡張など全ての Claude Code セッション** + Claude Desktop アプリのメッセージ送信イベント
 
 ## インストール & 起動
@@ -46,9 +49,12 @@ open /Applications/ClawnPet.app
 
 | 操作 | 動作 |
 |---|---|
+| クリック | とじる／ひらく（ミニ表示の切替） |
+| セッションカードをクリック | そのセッションを Claude Desktop で開く |
 | ドラッグ | 好きな場所に移動（位置は記憶される） |
 | ダブルクリック | なでる（よろこぶ） |
-| 右クリック / メニューバーの 🦀 | メニュー（デモ再生・スナップショット・位置リセット・終了） |
+| ▾ ボタン | セッションカードの表示/非表示 |
+| 右クリック / メニューバーの 🦀 | メニュー（実況ボイス切替・開閉・デモ再生・終了など） |
 
 ## 状態一覧
 
@@ -71,9 +77,16 @@ open /Applications/ClawnPet.app
 | `~/Library/Logs/Claude/main.log` | Claude Desktop のメッセージ送信・セッション一時停止イベント |
 | `~/.claude/sessions/*.json` | 稼働中セッション数（pid 生存確認つき） |
 
-最も新しく更新された transcript を自動追尾するので、複数セッションを行き来しても
-「いま動いているセッション」を実況します。詳しい調査結果は
-[docs/FEASIBILITY.md](docs/FEASIBILITY.md) を参照。
+直近 30 分に動いた transcript（最大 6 本）を並行追尾し、メインの Clawn は
+いちばん最近動いたセッションを実況します。詳しい調査結果は
+[docs/FEASIBILITY.md](docs/FEASIBILITY.md)、設計の全体像は
+[docs/architecture.html](docs/architecture.html) を参照。
+
+### 音声実況（VOICEVOX 連携）
+
+[VOICEVOX](https://voicevox.hiroshiba.jp/) が起動していれば（`localhost:50021`）、
+ずんだもんが実況してくれます。VOICEVOX がいなければ macOS のシステム音声に自動フォールバック。
+メニューバー 🦀 → 「こえ（実況ボイス）」で OFF / システム / VOICEVOX を切替できます。
 
 ## デバッグ用環境変数
 

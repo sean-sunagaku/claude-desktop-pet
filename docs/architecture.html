@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClawnPet アーキテクチャ &amp; 実装ドキュメント</title>
+<style>
+  :root {
+    --bg: #FFF8F2;
+    --panel: #FFFFFF;
+    --ink: #4A3A32;
+    --sub: #8A7A70;
+    --coral: #E8825D;
+    --coral-dark: #9E4B2F;
+    --coral-soft: #F6C4A8;
+    --line: #EADFD7;
+    --code-bg: #F6EEE8;
+    --accent: #D96D47;
+    --ok: #4C9E6C;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1E1916;
+      --panel: #2A231F;
+      --ink: #F0E5DD;
+      --sub: #B3A398;
+      --line: #453A33;
+      --code-bg: #352C26;
+      --coral-soft: #6E4632;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    line-height: 1.75;
+    font-size: 15px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.hero {
+    background: linear-gradient(135deg, var(--coral) 0%, var(--accent) 100%);
+    border-radius: 20px;
+    color: #FFF6F0;
+    padding: 36px 32px;
+    margin-bottom: 36px;
+  }
+  header.hero h1 { font-size: 26px; letter-spacing: .02em; }
+  header.hero .crab { font-size: 34px; }
+  header.hero p { opacity: .92; margin-top: 8px; font-size: 13.5px; }
+  header.hero .meta { margin-top: 14px; font-size: 12px; opacity: .85; }
+  nav.toc {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 22px; margin-bottom: 40px; font-size: 13.5px;
+  }
+  nav.toc b { display: block; margin-bottom: 6px; color: var(--sub); font-size: 12px; letter-spacing: .08em; }
+  nav.toc a { color: var(--accent); text-decoration: none; margin-right: 14px; display: inline-block; }
+  nav.toc a:hover { text-decoration: underline; }
+  h2 {
+    font-size: 20px; margin: 48px 0 16px; padding-left: 12px;
+    border-left: 5px solid var(--coral); letter-spacing: .02em;
+  }
+  h3 { font-size: 15.5px; margin: 26px 0 10px; color: var(--accent); }
+  p { margin: 10px 0; }
+  section > p, section > table, section > ul, section > ol { margin-left: 2px; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); font-size: 12.5px; color: var(--sub); }
+  code {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+    background: var(--code-bg); border-radius: 5px; padding: 1.5px 6px;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; margin: 14px 0; line-height: 1.6;
+  }
+  pre code { background: none; padding: 0; font-size: 12.5px; }
+  .figure {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px; margin: 18px 0; overflow-x: auto;
+  }
+  .figure figcaption { font-size: 12px; color: var(--sub); margin-top: 10px; text-align: center; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 14px 0; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+  }
+  .card h4 { font-size: 13.5px; color: var(--accent); margin-bottom: 6px; }
+  .card p { font-size: 12.8px; color: var(--sub); margin: 0; }
+  .badge {
+    display: inline-block; font-size: 11px; border-radius: 999px; padding: 1px 10px;
+    background: var(--coral-soft); color: var(--ink); margin-left: 8px; vertical-align: 2px;
+  }
+  ul.notes { padding-left: 22px; font-size: 13.5px; }
+  ul.notes li { margin: 6px 0; }
+  .callout {
+    border-left: 4px solid var(--coral); background: var(--panel);
+    border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 16px 0; font-size: 13.5px;
+  }
+  footer { margin-top: 64px; color: var(--sub); font-size: 12px; text-align: center; }
+  svg text { font-family: "Hiragino Sans", sans-serif; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1><span class="crab">🦀</span> ClawnPet アーキテクチャ &amp; 実装ドキュメント</h1>
+  <p>Claude Desktop / Claude Code の作業をローカルファイル監視だけでリアルタイム実況する macOS デスクトップペットの設計資料</p>
+  <div class="meta">v0.2 ・ 2026-07-14 ・ Swift / AppKit（依存ライブラリゼロ）・ <a href="https://github.com/sean-sunagaku/claude-desktop-pet" style="color:#FFE9DC">GitHub: sean-sunagaku/claude-desktop-pet</a></div>
+</header>
+
+<nav class="toc">
+  <b>目次</b>
+  <a href="#overview">1. 概要と設計原則</a>
+  <a href="#arch">2. 全体アーキテクチャ</a>
+  <a href="#signals">3. シグナル源</a>
+  <a href="#components">4. コンポーネント</a>
+  <a href="#statemachine">5. 状態マシン</a>
+  <a href="#routing">6. イベントルーティング</a>
+  <a href="#layout">7. UI レイアウト</a>
+  <a href="#voice">8. 音声実況</a>
+  <a href="#debug">9. 検証とデバッグ</a>
+  <a href="#limits">10. 制約と拡張</a>
+</nav>
+
+<section id="overview">
+<h2>1. 概要と設計原則</h2>
+<p>ClawnPet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・吹き出し・音声で実況するアプリです。</p>
+<div class="cards">
+  <div class="card"><h4>📖 読み取りのみ</h4><p>Claude アプリが元々ローカルに書き出すファイルを tail するだけ。ネットワーク送信・プロセス介入・UI 自動操作は一切しない（VOICEVOX への localhost リクエストを除く）。</p></div>
+  <div class="card"><h4>🧩 依存ゼロ</h4><p>Swift + AppKit + AVFoundation のみ。<code>swiftc</code> 一発でビルドでき、パッケージマネージャも Xcode プロジェクトも不要。</p></div>
+  <div class="card"><h4>⏱ 1 秒ポーリング</h4><p>FSEvents ではなく単純なポーリング + 差分 tail。堅牢でデバッグしやすく、消費リソースも無視できる規模（stat 数百回/秒以下）。</p></div>
+  <div class="card"><h4>🎭 セッション = Brain</h4><p>セッションごとに独立した状態マシン（PetBrain）を持ち、メインの Clawn は「直近アクティブなセッション」を実況する。</p></div>
+</div>
+</section>
+
+<section id="arch">
+<h2>2. 全体アーキテクチャ</h2>
+<figure class="figure">
+<svg viewBox="0 0 820 470" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--sub)"/>
+    </marker>
+  </defs>
+  <!-- シグナル源 -->
+  <g font-size="11.5">
+    <rect x="10" y="20" width="230" height="200" rx="12" fill="none" stroke="var(--line)" stroke-dasharray="4 3"/>
+    <text x="22" y="42" fill="var(--sub)" font-size="11">シグナル源（ローカルファイル）</text>
+    <rect x="22" y="54" width="206" height="34" rx="8" fill="var(--code-bg)" stroke="var(--line)"/>
+    <text x="32" y="75" fill="var(--ink)">~/.claude/projects/**/*.jsonl</text>
+    <rect x="22" y="94" width="206" height="34" rx="8" fill="var(--code-bg)" stroke="var(--line)"/>
+    <text x="32" y="115" fill="var(--ink)">~/.claude/history.jsonl</text>
+    <rect x="22" y="134" width="206" height="34" rx="8" fill="var(--code-bg)" stroke="var(--line)"/>
+    <text x="32" y="155" fill="var(--ink)">~/Library/Logs/Claude/main.log</text>
+    <rect x="22" y="174" width="206" height="34" rx="8" fill="var(--code-bg)" stroke="var(--line)"/>
+    <text x="32" y="195" fill="var(--ink)">~/.claude/sessions/*.json</text>
+  </g>
+  <!-- Watchers -->
+  <g font-size="11.5">
+    <rect x="290" y="20" width="220" height="200" rx="12" fill="none" stroke="var(--coral)" stroke-width="1.5"/>
+    <text x="302" y="42" fill="var(--coral-dark)" font-size="11" font-weight="bold">Watchers（1s ポーリング / 差分 tail）</text>
+    <rect x="302" y="54" width="196" height="34" rx="8" fill="var(--panel)" stroke="var(--coral)"/>
+    <text x="312" y="75" fill="var(--ink)">MultiTranscriptWatcher</text>
+    <rect x="302" y="94" width="196" height="34" rx="8" fill="var(--panel)" stroke="var(--coral)"/>
+    <text x="312" y="115" fill="var(--ink)">HistoryWatcher</text>
+    <rect x="302" y="134" width="196" height="34" rx="8" fill="var(--panel)" stroke="var(--coral)"/>
+    <text x="312" y="155" fill="var(--ink)">DesktopLogWatcher</text>
+    <rect x="302" y="174" width="196" height="34" rx="8" fill="var(--panel)" stroke="var(--coral)"/>
+    <text x="312" y="195" fill="var(--ink)">SessionsRegistry（10s）</text>
+  </g>
+  <!-- Router -->
+  <rect x="570" y="70" width="230" height="110" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
+  <text x="582" y="94" fill="var(--coral-dark)" font-size="12" font-weight="bold">AppDelegate（Router）</text>
+  <text x="582" y="116" fill="var(--ink)" font-size="11">・sessionId でイベントを振り分け</text>
+  <text x="582" y="134" fill="var(--ink)" font-size="11">・pending prompt 昇格（§6）</text>
+  <text x="582" y="152" fill="var(--ink)" font-size="11">・primary 選定 / 30分で prune</text>
+  <!-- Tracks -->
+  <rect x="570" y="230" width="230" height="100" rx="12" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="582" y="254" fill="var(--coral-dark)" font-size="12" font-weight="bold">SessionTrack × N</text>
+  <text x="582" y="276" fill="var(--ink)" font-size="11">PetBrain（状態マシン）を 1 個ずつ</text>
+  <text x="582" y="294" fill="var(--ink)" font-size="11">mood / statusLine / lastEvent</text>
+  <text x="582" y="312" fill="var(--sub)" font-size="11">最大 6 セッション追跡</text>
+  <!-- View & Speech -->
+  <rect x="290" y="370" width="240" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
+  <text x="302" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">PetView（AppKit / 30fps）</text>
+  <text x="302" y="414" fill="var(--ink)" font-size="11">メイン Clawn + 吹き出し</text>
+  <text x="302" y="432" fill="var(--ink)" font-size="11">セッションカード / ミニ表示</text>
+  <rect x="570" y="370" width="230" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
+  <text x="582" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">SpeechManager</text>
+  <text x="582" y="414" fill="var(--ink)" font-size="11">VOICEVOX (localhost:50021)</text>
+  <text x="582" y="432" fill="var(--ink)" font-size="11">↳ 不在時はシステム音声に fallback</text>
+  <!-- arrows -->
+  <line x1="240" y1="71" x2="300" y2="71" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <line x1="240" y1="111" x2="300" y2="111" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <line x1="240" y1="151" x2="300" y2="151" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <line x1="240" y1="191" x2="300" y2="191" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <line x1="510" y1="120" x2="568" y2="120" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <text x="514" y="110" fill="var(--sub)" font-size="10">PetEvent</text>
+  <line x1="685" y1="180" x2="685" y2="228" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <line x1="640" y1="330" x2="480" y2="368" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <text x="470" y="352" fill="var(--sub)" font-size="10">PetStatus / SessionCard</text>
+  <line x1="700" y1="330" x2="700" y2="368" stroke="var(--sub)" marker-end="url(#arr)"/>
+  <text x="708" y="352" fill="var(--sub)" font-size="10">onSpeak</text>
+</svg>
+<figcaption>データフロー: ローカルファイル → Watchers → Router → セッションごとの PetBrain → 描画/音声</figcaption>
+</figure>
+<p>すべてのウォッチャーはバックグラウンドの serial queue でポーリングし、イベントは <code>DispatchQueue.main</code> に載せ替えてから Router に渡します。UI と状態マシンはメインスレッドのみで触るため、ロックは不要です。</p>
+</section>
+
+<section id="signals">
+<h2>3. シグナル源<span class="badge">検証済み</span></h2>
+<table>
+<tr><th>ファイル</th><th>得られる情報</th><th>鮮度</th><th>担当ウォッチャー</th></tr>
+<tr><td><code>~/.claude/projects/&lt;proj&gt;/&lt;session&gt;.jsonl</code></td><td>セッション transcript の全行。user 発話 / tool_use（ツール名）/ tool_result / assistant 本文 / cwd / isSidechain</td><td>追記即時</td><td>MultiTranscriptWatcher</td></tr>
+<tr><td><code>~/.claude/history.jsonl</code></td><td>全セッション横断のユーザープロンプト本文 + project + sessionId</td><td>送信瞬間</td><td>HistoryWatcher</td></tr>
+<tr><td><code>~/Library/Logs/Claude/main.log</code></td><td>Claude Desktop の <code>LocalSessions.sendMessage</code>（文字数付き）、セッション pause、ウィンドウフォーカス</td><td>即時</td><td>DesktopLogWatcher</td></tr>
+<tr><td><code>~/.claude/sessions/&lt;pid&gt;.json</code></td><td>稼働中セッションのレジストリ {pid, sessionId, cwd, name}。pid 生存確認で現役判定</td><td>数秒</td><td>SessionsRegistry</td></tr>
+</table>
+<div class="callout">💡 <b>transcript の要点:</b> <code>content</code> が文字列（または <code>{type:"text"}</code> 配列）の user 行が人間の発話。<code>tool_result</code> を含む user 行はエージェントの継続実行。<code>isMeta: true</code> と <code>&lt;</code> 始まりのテキスト（<code>&lt;command-name&gt;</code> 等）はシステム由来なので除外する。</div>
+</section>
+
+<section id="components">
+<h2>4. コンポーネント構成</h2>
+<table>
+<tr><th>ファイル</th><th>責務</th><th>主な型</th></tr>
+<tr><td><code>main.swift</code></td><td>エントリポイント。<code>NSApplication</code> を accessory（Dock 非表示）で起動</td><td>—</td></tr>
+<tr><td><code>PetCore.swift</code></td><td>ドメイン層。イベント定義・セッションごとの状態マシン・表示/発話文言の生成</td><td><code>PetEvent</code> <code>PetMood</code> <code>PetBrain</code> <code>SessionCard</code></td></tr>
+<tr><td><code>Watchers.swift</code></td><td>ファイル監視層。差分 tail（ローテーション対応）と JSONL / ログのパース</td><td><code>TailReader</code> <code>PollingWatcher</code> と各 Watcher</td></tr>
+<tr><td><code>Speech.swift</code></td><td>音声実況。VOICEVOX HTTP API とシステム音声の切替・レート制限</td><td><code>SpeechManager</code></td></tr>
+<tr><td><code>PetView.swift</code></td><td>描画層。Clawn 本体（全モーション）・吹き出し・セッションカード・ミニ表示・クリック/ドラッグ判定</td><td><code>PetView</code></td></tr>
+<tr><td><code>AppDelegate.swift</code></td><td>結線。ウィンドウ管理（伸縮）・イベントルーティング・メニューバー・デモ・シグナル</td><td><code>AppDelegate</code> <code>SessionTrack</code></td></tr>
+<tr><td><code>tools/render_icon.swift</code></td><td>アプリアイコンをコードから描画して PNG 出力（<code>build</code> 時ではなく手動再生成）</td><td>—</td></tr>
+</table>
+
+<h3>TailReader（差分 tail の要）</h3>
+<pre><code>1. 前回オフセットから追記分だけ read（最大 2MB/回）
+2. 改行で完全な行に分割し、末尾の未完行は leftover として持ち越す
+3. ファイルサイズ &lt; オフセット を検知したらローテーションとみなし 0 から読み直す
+4. 新規追跡時は tailBytes だけ末尾から遡り、20 秒より古い行はパース側で捨てる</code></pre>
+</section>
+
+<section id="statemachine">
+<h2>5. 状態マシン（PetBrain）</h2>
+<figure class="figure">
+<svg viewBox="0 0 780 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--coral)"/>
+    </marker>
+  </defs>
+  <g font-size="12.5" text-anchor="middle">
+    <ellipse cx="90" cy="150" rx="62" ry="34" fill="var(--panel)" stroke="var(--coral)" stroke-width="2"/>
+    <text x="90" y="146" fill="var(--ink)" font-weight="bold">idle</text>
+    <text x="90" y="164" fill="var(--sub)" font-size="10.5">まったり</text>
+    <ellipse cx="290" cy="60" rx="70" ry="34" fill="var(--panel)" stroke="var(--coral)" stroke-width="2"/>
+    <text x="290" y="56" fill="var(--ink)" font-weight="bold">thinking</text>
+    <text x="290" y="74" fill="var(--sub)" font-size="10.5">かんがえ中 💭</text>
+    <ellipse cx="520" cy="60" rx="70" ry="34" fill="var(--panel)" stroke="var(--coral)" stroke-width="2"/>
+    <text x="520" y="56" fill="var(--ink)" font-weight="bold">working</text>
+    <text x="520" y="74" fill="var(--sub)" font-size="10.5">カタカタ 🔧</text>
+    <ellipse cx="680" cy="180" rx="76" ry="34" fill="var(--panel)" stroke="var(--coral)" stroke-width="2"/>
+    <text x="680" y="176" fill="var(--ink)" font-weight="bold">celebrating</text>
+    <text x="680" y="194" fill="var(--sub)" font-size="10.5">へんじきた 🎉</text>
+    <ellipse cx="290" cy="240" rx="70" ry="34" fill="var(--panel)" stroke="var(--line)" stroke-width="2"/>
+    <text x="290" y="236" fill="var(--ink)" font-weight="bold">sleeping</text>
+    <text x="290" y="254" fill="var(--sub)" font-size="10.5">すやすや 💤</text>
+  </g>
+  <g font-size="10.5" fill="var(--sub)">
+    <path d="M 140 122 Q 180 80 222 66" fill="none" stroke="var(--coral)" stroke-width="1.6" marker-end="url(#arr2)"/>
+    <text x="150" y="80">プロンプト送信</text>
+    <path d="M 360 60 L 448 60" fill="none" stroke="var(--coral)" stroke-width="1.6" marker-end="url(#arr2)"/>
+    <text x="404" y="50">tool_use</text>
+    <path d="M 570 90 Q 630 120 660 146" fill="none" stroke="var(--coral)" stroke-width="1.6" marker-end="url(#arr2)"/>
+    <text x="650" y="118">assistant 本文</text>
+    <path d="M 330 90 Q 480 150 608 166" fill="none" stroke="var(--coral)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr2)"/>
+    <text x="452" y="140">応答（ツールなし）</text>
+    <path d="M 604 190 Q 400 220 152 172" fill="none" stroke="var(--coral)" stroke-width="1.6" marker-end="url(#arr2)"/>
+    <text x="390" y="196">7 秒後</text>
+    <path d="M 152 180 Q 190 210 222 228" fill="none" stroke="var(--line)" stroke-width="1.6" marker-end="url(#arr2)"/>
+    <text x="140" y="216">8 分イベントなし</text>
+    <path d="M 226 218 Q 180 190 146 172" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr2)"/>
+    <text x="248" y="205">イベントで起床</text>
+    <path d="M 520 94 C 520 130 420 90 452 78" fill="none" stroke="var(--coral)" stroke-width="1.2" marker-end="url(#arr2)"/>
+    <text x="497" y="122">tool_use（継続）</text>
+  </g>
+</svg>
+<figcaption>気分の遷移。タイムアウト系（thinking 15分 / working 8分停滞 → idle）は保険として別途持つ</figcaption>
+</figure>
+<table>
+<tr><th>遷移トリガー</th><th>遷移先</th><th>実況（音声）</th></tr>
+<tr><td>userPrompt / userMessage / desktopSendMessage</td><td>thinking</td><td>「（プロンプト先頭20文字）、かんがえちゅう！」</td></tr>
+<tr><td>toolUse（working への進入時のみ発話）</td><td>working</td><td>「ターミナルでさぎょうちゅう！」等ツール別</td></tr>
+<tr><td>assistantText</td><td>celebrating（7 秒）</td><td>「へんじがきたよ！（本文先頭26文字）」※割り込み再生</td></tr>
+<tr><td>celebrating タイムアウト / desktopSessionPaused</td><td>idle</td><td>—</td></tr>
+<tr><td>8 分イベントなし</td><td>sleeping</td><td>「おやすみなさい」</td></tr>
+</table>
+</section>
+
+<section id="routing">
+<h2>6. イベントルーティング</h2>
+<p>Router（AppDelegate）は sessionId（= transcript のファイル名）ごとに <code>SessionTrack</code> を生成し、イベントを対応する PetBrain に配送します。</p>
+<ul class="notes">
+  <li><b>primary 選定:</b> <code>lastEvent</code> が最新の Track がメインの Clawn を駆動する。セッションが 1 つもない時は <code>defaultBrain</code>（挨拶用）を表示。</li>
+  <li><b>pending prompt 昇格:</b> <code>history.jsonl</code> のプロンプトは transcript より先に届くことがある。未知の sessionId なら 15 秒だけ保留し、transcript 側の <code>userMessage</code> が来た瞬間に本文付きの <code>userPrompt</code> へ昇格させる。これで新規セッションの 1 通目から本文を吹き出しに出せる。</li>
+  <li><b>prune:</b> 30 分イベントがない Track は破棄（カードも消える）。追跡は直近更新の transcript 最大 6 本。</li>
+  <li><b>Desktop イベント:</b> <code>main.log</code> の sessionId（<code>local_*</code>）は transcript の sessionId と対応しないため、primary Track に配送する。</li>
+  <li><b>サブエージェント:</b> <code>isSidechain: true</code> の行はツール実行のみ拾い、「(サブエージェント)」の接頭辞を付ける。</li>
+  <li><b>セッションへジャンプ:</b> カードクリックで <code>claude://resume?session=&lt;uuid&gt;</code> を開く。Claude Desktop が transcript からセッションを取り込み、該当セッションにフォーカスする（実測: <code>Imported CLI session … / setFocusedSession</code>）。パラメータ名が <code>session</code> であることは app.asar のディープリンクハンドラから特定した。</li>
+</ul>
+</section>
+
+<section id="layout">
+<h2>7. UI レイアウト（開閉とカード）</h2>
+<figure class="figure">
+<svg viewBox="0 0 760 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <g font-size="11">
+    <!-- expanded with cards -->
+    <rect x="30" y="16" width="200" height="268" rx="10" fill="none" stroke="var(--coral)" stroke-width="1.5"/>
+    <text x="130" y="8" text-anchor="middle" fill="var(--sub)" font-size="10.5">ひらく + カード（280 × 320+54n）</text>
+    <rect x="42" y="28" width="176" height="40" rx="8" fill="var(--code-bg)" stroke="var(--coral)" stroke-width="1.4"/>
+    <text x="50" y="52" fill="var(--ink)">🦀 カード1（primary 強調枠）</text>
+    <rect x="42" y="74" width="176" height="40" rx="8" fill="var(--code-bg)" stroke="var(--line)"/>
+    <text x="50" y="98" fill="var(--ink)">🦀 カード2</text>
+    <text x="206" y="130" fill="var(--sub)">▾ 開閉ボタン</text>
+    <rect x="42" y="140" width="176" height="64" rx="10" fill="var(--panel)" stroke="var(--line)"/>
+    <text x="50" y="166" fill="var(--ink)" font-weight="bold">吹き出し（状態 + 文脈）</text>
+    <text x="50" y="186" fill="var(--sub)">しっぽは Clawn の頭上へ</text>
+    <text x="130" y="252" text-anchor="middle" font-size="30">🦀</text>
+    <text x="130" y="274" text-anchor="middle" fill="var(--sub)">Clawn 本体（アニメーション）</text>
+    <!-- collapsed -->
+    <rect x="330" y="180" width="84" height="86" rx="10" fill="none" stroke="var(--coral)" stroke-width="1.5"/>
+    <text x="372" y="172" text-anchor="middle" fill="var(--sub)" font-size="10.5">とじる（116 × 112）</text>
+    <text x="404" y="204" font-size="13">🔧</text>
+    <text x="372" y="246" text-anchor="middle" font-size="24">🦀</text>
+    <!-- arrows -->
+    <path d="M 240 150 Q 285 150 326 200" fill="none" stroke="var(--sub)" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="262" y="140" fill="var(--sub)">クリック</text>
+    <path d="M 330 240 Q 280 260 238 220" fill="none" stroke="var(--sub)" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="268" y="272" fill="var(--sub)">クリック</text>
+    <!-- notes -->
+    <g font-size="11.5" fill="var(--ink)">
+      <text x="480" y="40">・ウィンドウは右端アンカーで伸縮</text>
+      <text x="480" y="64">・borderless / 透過 / .floating / 全スペース追従</text>
+      <text x="480" y="88">・ドラッグ移動（3px 超で performDrag）</text>
+      <text x="480" y="112">・クリック = 開閉（250ms 待ってダブルと判別）</text>
+      <text x="480" y="136">・ダブルクリック = なでる 🎉</text>
+      <text x="480" y="160">・ミニ表示は 0.52 倍描画 + 気分バッジ</text>
+      <text x="480" y="184">・ミニでも監視と音声実況は継続</text>
+      <text x="480" y="208">・カードはアクティブセッション数だけ積む</text>
+      <text x="480" y="232">・位置/開閉/音声設定は UserDefaults に永続化</text>
+    </g>
+  </g>
+</svg>
+<figcaption>ひらく ⇄ とじる。描画はモデル座標（幅 280）固定で、ミニ表示はアフィン変換で縮小する</figcaption>
+</figure>
+</section>
+
+<section id="voice">
+<h2>8. 音声実況（SpeechManager）</h2>
+<ul class="notes">
+  <li><b>エンジン:</b> VOICEVOX（<code>http://127.0.0.1:50021</code>, 既定話者 ID 3 = ずんだもん）→ 不在時は自動でシステム音声（<code>AVSpeechSynthesizer</code>, ja-JP）へフォールバック。メニューから OFF / システム / VOICEVOX を切替可能。</li>
+  <li><b>VOICEVOX API フロー:</b> <code>POST /audio_query?speaker=3&amp;text=…</code> → 返ってきた JSON をそのまま <code>POST /synthesis?speaker=3</code> へ → WAV を <code>AVAudioPlayer</code> で再生。</li>
+  <li><b>レート制限:</b> 通常発話は 7 秒間隔。応答到着（celebrating）だけは割り込みフラグ付きで必ず喋る。</li>
+  <li><b>マルチセッション時:</b> 2 セッション以上追跡中はプロジェクト名を接頭辞に付ける（「pet、へんじがきたよ！」）。</li>
+  <li><b>死活監視:</b> 30 秒ごとに <code>GET /version</code>（タイムアウト 1.2 秒）で VOICEVOX の生存確認。</li>
+</ul>
+</section>
+
+<section id="debug">
+<h2>9. 検証とデバッグ</h2>
+<table>
+<tr><th>手段</th><th>内容</th></tr>
+<tr><td><code>CLAWN_DEBUG=1</code></td><td>イベント・状態遷移・スナップショットの記録を stderr へ出力</td></tr>
+<tr><td><code>CLAWN_WATCH_DIR</code> / <code>CLAWN_HISTORY</code> / <code>CLAWN_MAINLOG</code></td><td>監視パスの差し替え。フェイク JSONL を append して全遷移を再現テストできる</td></tr>
+<tr><td><code>SIGUSR1</code></td><td>ペットの現在の見た目を PNG に自己レンダリング（<code>CLAWN_SNAPSHOT_PATH</code>）。スクリーンショット権限不要の自己検証手段</td></tr>
+<tr><td><code>SIGUSR2</code> / メニュー「デモ再生」</td><td>プロンプト→ツール実行→応答→片付けの全モーション+音声を順に再生</td></tr>
+<tr><td>メニュー「こえテスト」</td><td>現在のエンジンで 1 フレーズ発話</td></tr>
+</table>
+<div class="callout">🧪 <b>開発時の実績:</b> フェイクイベントでの全遷移テスト → 実環境で開発セッション自身のツール実行を 1 秒以内に検知することを確認、という 2 段構えで検証。詳細は <code>docs/FEASIBILITY.md</code>。</div>
+</section>
+
+<section id="limits">
+<h2>10. 制約と拡張ポイント</h2>
+<ul class="notes">
+  <li><b>claude.ai Web チャット未対応:</b> Desktop 内のブラウザチャットはローカルにメッセージを書き出さない。残る道は CDP（<code>--remote-debugging-port</code>）で、実行中はシングルトンロックのため検証不可だった。検証手順と設計案は FEASIBILITY.md の CDP 章を参照。</li>
+  <li><b>assistant 本文はブロック確定単位:</b> トークン単位のストリーミング途中経過は transcript に書かれない。</li>
+  <li><b>スケジュールタスク名は取れない:</b> <code>main.log</code> にはライフサイクル（Initialized 等）しか出ず、タスク名はサーバー側。</li>
+  <li><b>拡張案:</b> CDP ウォッチャー（opt-in）/ カードクリックでプロジェクトを開く / 応答完了の通知センター連携 / セッションごとの担当ボイス切替。</li>
+</ul>
+</section>
+
+<footer>
+  🦀 ClawnPet v0.2 — 2026-07-14 ・ MIT License ・ 非公式プロジェクト（Anthropic とは無関係です）
+</footer>
+
+</div>
+</body>
+</html>

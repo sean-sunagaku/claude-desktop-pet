@@ -8,6 +8,15 @@ final class PetView: NSView {
     var statusLine: String = "こんにちは！Clawn だよ"
     var contextLine: String = "Claude の作業を見守るね"
     var sessionsInfo: String = ""
+    var sessionCards: [SessionCard] = []
+    var cardsVisible = true
+    var collapsed = false
+
+    static let petAreaHeight: CGFloat = 320 // ペット+吹き出しの基本領域
+    static let cardHeight: CGFloat = 48
+    static let cardGap: CGFloat = 6
+    static let collapsedSize = NSSize(width: 116, height: 112)
+    private static let collapsedScale: CGFloat = 0.52
 
     // アニメーション用
     private var t: CFTimeInterval = 0
@@ -16,6 +25,11 @@ final class PetView: NSView {
     private var blinkUntil: CFTimeInterval = 0
     var onRightClick: ((NSEvent) -> Void)?
     var onDoubleClick: (() -> Void)?
+    var onClick: (() -> Void)?
+    var onCardClick: ((Int) -> Void)?
+    private var dragStartPoint: NSPoint?
+    private var dragMoved = false
+    private var pendingClick: DispatchWorkItem?
 
     // カラーパレット
     private let bodyColor    = NSColor(red: 0.910, green: 0.512, blue: 0.365, alpha: 1) // #E8825D
@@ -27,7 +41,7 @@ final class PetView: NSView {
     private let textColor    = NSColor(red: 0.290, green: 0.227, blue: 0.196, alpha: 1)
     private let subTextColor = NSColor(red: 0.541, green: 0.478, blue: 0.439, alpha: 1)
 
-    override var mouseDownCanMoveWindow: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false } // ドラッグは自前実装（クリック判定のため）
     override var isFlipped: Bool { false }
 
     func tick(_ dt: CFTimeInterval) {
@@ -41,9 +55,41 @@ final class PetView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) { onRightClick?(event) }
+
+    // クリック（開閉）/ ダブルクリック（なでる）/ ドラッグ（移動）を判別する
     override func mouseDown(with event: NSEvent) {
-        if event.clickCount == 2 { onDoubleClick?() }
-        super.mouseDown(with: event)
+        if event.clickCount == 2 {
+            pendingClick?.cancel()
+            pendingClick = nil
+            dragStartPoint = nil
+            onDoubleClick?()
+            return
+        }
+        dragStartPoint = event.locationInWindow
+        dragMoved = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let start = dragStartPoint, !dragMoved else { return }
+        let p = event.locationInWindow
+        if hypot(p.x - start.x, p.y - start.y) > 3 {
+            dragMoved = true
+            window?.performDrag(with: event)
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { dragStartPoint = nil }
+        guard dragStartPoint != nil, !dragMoved else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        if let idx = cardIndex(at: p) {
+            onCardClick?(idx) // カードは即時反応（セッションへジャンプ）
+            return
+        }
+        // ダブルクリック猶予を待ってからシングルクリック扱いにする
+        let work = DispatchWorkItem { [weak self] in self?.onClick?() }
+        pendingClick = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
     // MARK: 描画
@@ -52,8 +98,7 @@ final class PetView: NSView {
         guard let ctx = NSGraphicsContext.current else { return }
         ctx.imageInterpolation = .high
 
-        let W = bounds.width
-        let cx = W / 2
+        let cx: CGFloat = 140 // モデル座標系（幅 280 前提）の中心
         let phase = CACurrentMediaTime() - moodChangedAt
 
         // 気分ごとの体の上下動
@@ -75,13 +120,180 @@ final class PetView: NSView {
 
         let baseY: CGFloat = 68 + bob + jump  // 体の中心 Y
 
+        if collapsed {
+            // ミニ表示: カニだけを縮小描画（吹き出し・カードなし）
+            NSGraphicsContext.saveGraphicsState()
+            let tf = NSAffineTransform()
+            tf.translateX(by: Self.collapsedSize.width / 2 - cx * Self.collapsedScale, yBy: 4)
+            tf.scale(by: Self.collapsedScale)
+            tf.concat()
+            drawCrab(cx: cx, baseY: baseY, breatheY: breatheY, jump: jump, phase: phase)
+            NSGraphicsContext.restoreGraphicsState()
+            drawCollapsedBadge()
+            return
+        }
+
+        drawCrab(cx: cx, baseY: baseY, breatheY: breatheY, jump: jump, phase: phase)
+        drawBubble(cx: cx)
+        drawSessionCards()
+    }
+
+    private func drawCrab(cx: CGFloat, baseY: CGFloat, breatheY: CGFloat, jump: CGFloat, phase: CGFloat) {
         drawShadow(cx: cx, jump: jump)
         drawLegs(cx: cx, y: baseY)
         drawClaws(cx: cx, y: baseY, phase: phase)
         drawBody(cx: cx, y: baseY, breatheY: breatheY)
         drawFace(cx: cx, y: baseY)
         drawExtras(cx: cx, y: baseY, phase: phase)
-        drawBubble(cx: cx)
+    }
+
+    /// ミニ表示時の気分バッジ（右上）
+    private func drawCollapsedBadge() {
+        let badge: String
+        switch mood {
+        case .thinking: badge = "💭"
+        case .working: badge = "🔧"
+        case .celebrating: badge = "🎉"
+        case .sleeping: badge = "💤"
+        case .idle: return
+        }
+        let bobY = sin(t * 3) * 1.5
+        (badge as NSString).draw(at: NSPoint(x: Self.collapsedSize.width - 30, y: Self.collapsedSize.height - 28 + bobY),
+                                 withAttributes: [.font: NSFont.systemFont(ofSize: 15)])
+    }
+
+    // MARK: セッションカード（アクティブな全セッションのスタック表示）
+
+    /// カード i（0 = 最新/最上段）の矩形
+    private func cardRect(_ i: Int) -> NSRect {
+        let y = bounds.height - 8 - Self.cardHeight - CGFloat(i) * (Self.cardHeight + Self.cardGap)
+        return NSRect(x: 8, y: y, width: bounds.width - 16, height: Self.cardHeight)
+    }
+
+    /// クリック位置がどのカードか（カード外なら nil）
+    func cardIndex(at point: NSPoint) -> Int? {
+        guard cardsVisible, !collapsed else { return nil }
+        for i in 0..<sessionCards.count {
+            let r = cardRect(i)
+            if r.minY < Self.petAreaHeight { break }
+            if r.contains(point) { return i }
+        }
+        return nil
+    }
+
+    private func drawSessionCards() {
+        guard cardsVisible, !sessionCards.isEmpty,
+              bounds.height > Self.petAreaHeight + Self.cardHeight else { return }
+        for (i, card) in sessionCards.enumerated() {
+            let rect = cardRect(i)
+            if rect.minY < Self.petAreaHeight { break }
+            drawCard(card, in: rect)
+        }
+    }
+
+    private func drawCard(_ card: SessionCard, in rect: NSRect) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: 11, yRadius: 11)
+        NSColor.white.withAlphaComponent(0.93).setFill()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.13)
+        shadow.shadowOffset = NSSize(width: 0, height: -1.5)
+        shadow.shadowBlurRadius = 4
+        NSGraphicsContext.saveGraphicsState()
+        shadow.set()
+        path.fill()
+        NSGraphicsContext.restoreGraphicsState()
+        if card.isPrimary {
+            bodyColor.withAlphaComponent(0.9).setStroke()
+            path.lineWidth = 2
+        } else {
+            NSColor(red: 0.90, green: 0.85, blue: 0.81, alpha: 1).setStroke()
+            path.lineWidth = 1.2
+        }
+        path.stroke()
+
+        // ミニカニ
+        drawMiniCrab(at: NSPoint(x: rect.minX + 25, y: rect.midY - 3), mood: card.mood)
+
+        // 気分バッジ（右上）
+        let badge: String
+        switch card.mood {
+        case .thinking: badge = "💭"
+        case .working: badge = "🔧"
+        case .celebrating: badge = "🎉"
+        case .idle: badge = "☕"
+        case .sleeping: badge = "💤"
+        }
+        (badge as NSString).draw(at: NSPoint(x: rect.maxX - 26, y: rect.midY + 2),
+                                 withAttributes: [.font: NSFont.systemFont(ofSize: 13)])
+
+        // 経過時間（右下）
+        let age = card.ageText as NSString
+        let ageAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 8.5), .foregroundColor: subTextColor
+        ]
+        let ageSize = age.size(withAttributes: ageAttrs)
+        age.draw(at: NSPoint(x: rect.maxX - 10 - ageSize.width, y: rect.minY + 6), withAttributes: ageAttrs)
+
+        // タイトル + 状態
+        let para = NSMutableParagraphStyle()
+        para.lineBreakMode = .byTruncatingTail
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10.5, weight: .bold), .foregroundColor: textColor, .paragraphStyle: para
+        ]
+        let statusAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 9.5), .foregroundColor: subTextColor, .paragraphStyle: para
+        ]
+        let textX = rect.minX + 46
+        let textW = rect.width - 46 - 34
+        (card.title as NSString).draw(in: NSRect(x: textX, y: rect.midY + 3, width: textW, height: 15), withAttributes: titleAttrs)
+        (card.statusLine as NSString).draw(in: NSRect(x: textX, y: rect.minY + 5, width: textW + 12, height: 14), withAttributes: statusAttrs)
+    }
+
+    /// カード用のちいさい Clawn（体+目+ハサミだけ）
+    private func drawMiniCrab(at c: NSPoint, mood: PetMood) {
+        let wiggle: CGFloat = (mood == .working) ? sin(t * 9) * 2 : 0
+        let clawLift: CGFloat = (mood == .celebrating) ? 7 : (mood == .working ? 3 + wiggle : 0)
+
+        // ハサミ
+        for side in [CGFloat(-1), 1] {
+            let claw = NSBezierPath(ovalIn: NSRect(x: c.x + side * 15 - 5, y: c.y + clawLift - 4, width: 10, height: 10))
+            clawColor.setFill()
+            claw.fill()
+        }
+        // 体
+        let body = NSBezierPath(ovalIn: NSRect(x: c.x - 14, y: c.y - 10, width: 28, height: 21))
+        bodyColor.setFill()
+        body.fill()
+        bodyDark.withAlphaComponent(0.5).setStroke()
+        body.lineWidth = 1.2
+        body.stroke()
+        // 目
+        for side in [CGFloat(-1), 1] {
+            let ex = c.x + side * 5
+            if mood == .sleeping {
+                let lid = NSBezierPath()
+                lid.lineWidth = 1.4
+                lid.lineCapStyle = .round
+                lid.move(to: NSPoint(x: ex - 2.5, y: c.y + 3))
+                lid.line(to: NSPoint(x: ex + 2.5, y: c.y + 3))
+                pupilColor.setStroke()
+                lid.stroke()
+            } else {
+                let eye = NSBezierPath(ovalIn: NSRect(x: ex - 3, y: c.y + 0.5, width: 6, height: 6))
+                NSColor.white.setFill()
+                eye.fill()
+                let pupil = NSBezierPath(ovalIn: NSRect(x: ex - 1.4, y: c.y + 2, width: 2.8, height: 2.8))
+                pupilColor.setFill()
+                pupil.fill()
+            }
+        }
+        // くち
+        let mouth = NSBezierPath()
+        mouth.lineWidth = 1.2
+        mouth.lineCapStyle = .round
+        mouth.appendArc(withCenter: NSPoint(x: c.x, y: c.y - 3.5), radius: 2.2, startAngle: 200, endAngle: 340, clockwise: false)
+        pupilColor.withAlphaComponent(0.75).setStroke()
+        mouth.stroke()
     }
 
     private func drawShadow(cx: CGFloat, jump: CGFloat) {
