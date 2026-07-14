@@ -461,6 +461,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         petView.collapsed = collapsed
         petView.sessionCount = tracks.count
+        petView.overflowCount = max(0, tracks.count - 6)
 
         statusMenuInfoItem?.title = "Clawn: \(status.statusLine)"
         collapseMenuItem?.title = collapsed ? "セッションをひらく" : "セッションをとじる"

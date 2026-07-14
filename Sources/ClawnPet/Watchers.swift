@@ -78,7 +78,7 @@ final class MultiTranscriptWatcher: PollingWatcher {
     private let root: URL
     /// アクティブとみなす transcript の更新期限（秒）
     private let activeWindow: TimeInterval = 1800
-    private let maxSessions = 6
+    private let maxSessions = 12 // 追跡上限。カード表示は 6 枚で、超過分は +N チップに出る
 
     private struct Tracked {
         let reader: TailReader

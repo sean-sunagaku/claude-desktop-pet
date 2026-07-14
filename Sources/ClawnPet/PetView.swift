@@ -8,10 +8,11 @@ final class PetView: NSView {
     var sessionCards: [SessionCard] = []
     var collapsed = false
     var sessionCount = 0 // バッジ用のアクティブセッション数
+    var overflowCount = 0 // カードに載り切らないセッション数（+N チップ表示）
 
     // カニは開閉どちらも同じサイズ（右下の 116×112 領域に 0.52 倍描画）。
     // 開いたときはその上にカードスタックと閉じるボタン（˅）が乗るだけ。
-    static let petAreaHeight: CGFloat = 146 // カニ領域 112 + 閉じるボタン域 34
+    static let petAreaHeight: CGFloat = 142 // カニ領域 112 + 頭上の ˅ ボタン域 30
     static let cardHeight: CGFloat = 48
     static let cardGap: CGFloat = 6
     static let collapsedSize = NSSize(width: 116, height: 112)
@@ -178,7 +179,31 @@ final class PetView: NSView {
         } else {
             drawCloseButton()
             drawSessionCards()
+            drawOverflowChip()
         }
+    }
+
+    /// カードに載り切らないセッション数の「+N」チップ（ChatGPT ペット風）。
+    /// カード最下段の下端に半分重ねて中央に置く
+    private func drawOverflowChip() {
+        guard overflowCount > 0, !sessionCards.isEmpty else { return }
+        let label = "+\(overflowCount)" as NSString
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+            .foregroundColor: NSColor(white: 0.92, alpha: 1),
+        ]
+        let size = label.size(withAttributes: attrs)
+        let w = size.width + 14
+        let h: CGFloat = 18
+        let rect = NSRect(x: (bounds.width - w) / 2, y: Self.petAreaHeight - h / 2, width: w, height: h)
+        let path = NSBezierPath(roundedRect: rect, xRadius: h / 2, yRadius: h / 2)
+        panelColor.setFill()
+        path.fill()
+        panelStroke.setStroke()
+        path.lineWidth = 1
+        path.stroke()
+        label.draw(at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2),
+                   withAttributes: attrs)
     }
 
     // MARK: 開閉コントロール（バッジ / ˅ ボタン）
@@ -191,11 +216,13 @@ final class PetView: NSView {
                       width: d, height: d)
     }
 
-    /// 開時の閉じるボタン（˅）の矩形。閉時のバッジと同じ場所に置く:
-    /// 右下角アンカーと合わせて、開閉しても画面上の同一座標に「開閉コントロール」が留まる
-    private func closeButtonRect() -> NSRect { badgeRect() }
+    /// 開時の閉じるボタン（˅）の矩形。ChatGPT ペットと同じくマスコットの頭上中央
+    private func closeButtonRect() -> NSRect {
+        let cxScreen = bounds.width - Self.collapsedSize.width / 2
+        return NSRect(x: cxScreen - 12, y: Self.collapsedSize.height + 2, width: 24, height: 24)
+    }
 
-    /// カニの右肩上の丸い ˅ ボタン（クリックでとじる）
+    /// カニの頭上の丸い ˅ ボタン（クリックでとじる）
     private func drawCloseButton() {
         let rect = closeButtonRect()
         panelColor.setFill()

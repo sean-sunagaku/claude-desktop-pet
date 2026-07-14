@@ -20,7 +20,7 @@ inspired by "desktop pet" companions, built for Claude.
 - **Detects when you send a message** and goes into "thinking" — status is narrated via session cards and voice
 - **Narrates tool use in real time** — terminal work, code edits, web searches, sub-agents…
 - **Jumps and sparkles when the reply lands**, quoting the first line of the response
-- **Session cards** — stacks up to 6 active sessions as cards, each with a mini crab showing that session's mood
+- **Session cards** — stacks active sessions as cards (up to 6; overflow shows as a ChatGPT-pet-style "+N" chip), each with a mini crab showing that session's mood
 - **Click a card to jump to that session** — opens it in Claude Desktop via the `claude://resume` deep link
 - **Voice narration** — VOICEVOX (Zundamon) or the macOS system voice reads out events in real time (switchable / off in the menu)
 - **Faces where it's going** — while dragged, Clawn leans into the direction of travel and its eyes follow; it settles back to front when you stop
