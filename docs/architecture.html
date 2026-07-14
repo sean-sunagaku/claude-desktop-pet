@@ -132,6 +132,7 @@
   <div class="card"><h4>⏱ 1 秒ポーリング</h4><p>FSEvents ではなく単純なポーリング + 差分 tail。堅牢でデバッグしやすく、消費リソースも無視できる規模（stat 数百回/秒以下）。</p></div>
   <div class="card"><h4>🎭 セッション = Brain</h4><p>セッションごとに独立した状態マシン（PetBrain）を持ち、メインの Clawn は「直近アクティブなセッション」を実況する。</p></div>
 </div>
+<div class="callout">🪟 <b>SwiftUI ではなく AppKit 直書きの理由:</b> このアプリのコードの大半が SwiftUI の抽象の下の層にあるため。①枠なし・背景透過・常時最前面・全スペース追従という特殊ウィンドウは <code>NSWindow</code>（styleMask / level / collectionBehavior）を直接操作する領域で、SwiftUI の WindowGroup にはこの層の API が無く、使っても結局 NSWindow を掘り出して同じコードを書くことになる。②中身は <code>NSBezierPath</code> による 30fps の手続き描画（呼吸・ジャンプ・向き変形）でレイアウトが存在せず、宣言的 UI の旨味が効かない。③250ms のクリック/ダブルクリック判別・3px 閾値からの <code>performDrag</code> 委譲・バッジ/˅/カードの自前ヒットテストなど、NSEvent を生で扱う入力処理が多い。将来、設定画面のような通常の UI を足す場合は、そこだけ <code>NSHostingView</code> で SwiftUI を併用するのが良い住み分け。</div>
 </section>
 
 <section id="arch">
