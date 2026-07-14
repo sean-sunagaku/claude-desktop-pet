@@ -45,8 +45,13 @@ final class PetView: NSView {
     private let bellyColor   = NSColor(red: 0.965, green: 0.769, blue: 0.659, alpha: 1) // #F6C4A8
     private let blushColor   = NSColor(red: 0.961, green: 0.627, blue: 0.549, alpha: 0.85)
     private let pupilColor   = NSColor(red: 0.227, green: 0.165, blue: 0.133, alpha: 1)
-    private let textColor    = NSColor(red: 0.290, green: 0.227, blue: 0.196, alpha: 1)
-    private let subTextColor = NSColor(red: 0.541, green: 0.478, blue: 0.439, alpha: 1)
+    // ダーク UI（吹き出し・カード）の配色。ChatGPT Desktop のタスクカード風
+    private let panelColor    = NSColor(red: 0.125, green: 0.125, blue: 0.13, alpha: 0.96)
+    private let panelStroke   = NSColor(white: 1, alpha: 0.10)
+    private let textColor     = NSColor(white: 0.96, alpha: 1)
+    private let subTextColor  = NSColor(white: 0.62, alpha: 1)
+    private let doneGreen     = NSColor(red: 0.20, green: 0.78, blue: 0.38, alpha: 1)
+    private let busyOrange    = NSColor(red: 0.94, green: 0.60, blue: 0.23, alpha: 1)
 
     override var mouseDownCanMoveWindow: Bool { false } // ドラッグは自前実装（クリック判定のため）
     override var isFlipped: Bool { false }
@@ -263,39 +268,25 @@ final class PetView: NSView {
     }
 
     private func drawCard(_ card: SessionCard, in rect: NSRect) {
-        let path = NSBezierPath(roundedRect: rect, xRadius: 11, yRadius: 11)
-        NSColor.white.withAlphaComponent(0.93).setFill()
+        let path = NSBezierPath(roundedRect: rect, xRadius: 15, yRadius: 15)
+        panelColor.setFill()
         let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.13)
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.30)
         shadow.shadowOffset = NSSize(width: 0, height: -1.5)
-        shadow.shadowBlurRadius = 4
+        shadow.shadowBlurRadius = 5
         NSGraphicsContext.saveGraphicsState()
         shadow.set()
         path.fill()
         NSGraphicsContext.restoreGraphicsState()
-        if card.isPrimary {
-            bodyColor.withAlphaComponent(0.9).setStroke()
-            path.lineWidth = 2
-        } else {
-            NSColor(red: 0.90, green: 0.85, blue: 0.81, alpha: 1).setStroke()
-            path.lineWidth = 1.2
-        }
+        (card.isPrimary ? NSColor(white: 1, alpha: 0.22) : panelStroke).setStroke()
+        path.lineWidth = card.isPrimary ? 1.4 : 1
         path.stroke()
 
         // ミニカニ
         drawMiniCrab(at: NSPoint(x: rect.minX + 25, y: rect.midY - 3), mood: card.mood)
 
-        // 気分バッジ（右上）
-        let badge: String
-        switch card.mood {
-        case .thinking: badge = "💭"
-        case .working: badge = "🔧"
-        case .celebrating: badge = "🎉"
-        case .idle: badge = "☕"
-        case .sleeping: badge = "💤"
-        }
-        (badge as NSString).draw(at: NSPoint(x: rect.maxX - 26, y: rect.midY + 2),
-                                 withAttributes: [.font: NSFont.systemFont(ofSize: 13)])
+        // 状態バッジ（右上の丸アイコン: 完了=緑チェック / 作業中=オレンジ… / 就寝=グレー z）
+        drawStateBadge(for: card.mood, at: NSPoint(x: rect.maxX - 18, y: rect.maxY - 18))
 
         // 経過時間（右下）
         let age = card.ageText as NSString
@@ -318,6 +309,45 @@ final class PetView: NSView {
         let textW = rect.width - 46 - 34
         (card.title as NSString).draw(in: NSRect(x: textX, y: rect.midY + 3, width: textW, height: 15), withAttributes: titleAttrs)
         (card.statusLine as NSString).draw(in: NSRect(x: textX, y: rect.minY + 5, width: textW + 12, height: 14), withAttributes: statusAttrs)
+    }
+
+    /// 丸い状態バッジ（ChatGPT のタスクカード右上の ✓ 風）
+    private func drawStateBadge(for mood: PetMood, at center: NSPoint) {
+        let color: NSColor
+        switch mood {
+        case .celebrating, .idle: color = doneGreen
+        case .working, .thinking: color = busyOrange
+        case .sleeping:           color = NSColor(white: 0.42, alpha: 1)
+        }
+        let r: CGFloat = 8
+        color.setFill()
+        NSBezierPath(ovalIn: NSRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)).fill()
+
+        let mark = NSBezierPath()
+        mark.lineWidth = 1.9
+        mark.lineCapStyle = .round
+        mark.lineJoinStyle = .round
+        NSColor.white.setStroke()
+        switch mood {
+        case .celebrating, .idle:
+            // チェックマーク
+            mark.move(to: NSPoint(x: center.x - 3.6, y: center.y + 0.2))
+            mark.line(to: NSPoint(x: center.x - 1.1, y: center.y - 2.6))
+            mark.line(to: NSPoint(x: center.x + 3.8, y: center.y + 2.8))
+            mark.stroke()
+        case .working, .thinking:
+            // 進行中ドット
+            for dx in [CGFloat(-4), 0, 4] {
+                NSColor.white.setFill()
+                NSBezierPath(ovalIn: NSRect(x: center.x + dx - 1.1, y: center.y - 1.1, width: 2.2, height: 2.2)).fill()
+            }
+        case .sleeping:
+            let z = "z" as NSString
+            let a: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: NSColor.white]
+            let s = z.size(withAttributes: a)
+            z.draw(at: NSPoint(x: center.x - s.width / 2, y: center.y - s.height / 2), withAttributes: a)
+        }
     }
 
     /// カード用のちいさい Clawn（体+目+ハサミだけ）
@@ -657,17 +687,17 @@ final class PetView: NSView {
         bubble.line(to: NSPoint(x: cx + 8, y: by))
         bubble.close()
 
-        NSColor.white.withAlphaComponent(0.95 * alpha).setFill()
+        panelColor.withAlphaComponent(0.96 * alpha).setFill()
         let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.18 * alpha)
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.30 * alpha)
         shadow.shadowOffset = NSSize(width: 0, height: -2)
-        shadow.shadowBlurRadius = 5
+        shadow.shadowBlurRadius = 6
         NSGraphicsContext.saveGraphicsState()
         shadow.set()
         bubble.fill()
         NSGraphicsContext.restoreGraphicsState()
-        NSColor(red: 0.90, green: 0.85, blue: 0.81, alpha: alpha).setStroke()
-        bubble.lineWidth = 1.5
+        panelStroke.withAlphaComponent(0.10 * alpha).setStroke()
+        bubble.lineWidth = 1
         bubble.stroke()
 
         // テキスト
