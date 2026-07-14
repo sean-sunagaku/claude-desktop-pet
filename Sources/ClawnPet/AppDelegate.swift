@@ -77,13 +77,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func setupWindow() {
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        var origin = NSPoint(x: screen.maxX - windowWidth - 24, y: screen.minY + 24)
+        // 起動直後は tracks が空なので必ず閉サイズ。位置は「右下角」を正として復元する
+        // （左下角基準だと、開閉でウィンドウ幅が変わるたびに右端＝カニの見た目位置がずれる）
+        let size = PetView.collapsedSize
         let d = UserDefaults.standard
-        if let x = d.object(forKey: "clawn.x") as? Double, let y = d.object(forKey: "clawn.y") as? Double {
-            origin = NSPoint(x: x, y: y)
+        var origin = NSPoint(x: screen.maxX - size.width - 24, y: screen.minY + 24)
+        if let right = d.object(forKey: "clawn.right") as? Double,
+           let bottom = d.object(forKey: "clawn.bottom") as? Double {
+            origin = NSPoint(x: right - Double(size.width), y: bottom)
+        } else if let x = d.object(forKey: "clawn.x") as? Double,
+                  let y = d.object(forKey: "clawn.y") as? Double {
+            origin = NSPoint(x: x, y: y) // 旧形式（左下角）からの引き継ぎ。次の移動で新形式に保存される
         }
-
-        let size = NSSize(width: windowWidth, height: PetView.petAreaHeight)
         window = NSWindow(contentRect: NSRect(origin: origin, size: size),
                           styleMask: [.borderless], backing: .buffered, defer: false)
         window.isOpaque = false
@@ -114,9 +119,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowDidMove(_ notification: Notification) {
-        let o = window.frame.origin
-        UserDefaults.standard.set(Double(o.x), forKey: "clawn.x")
-        UserDefaults.standard.set(Double(o.y), forKey: "clawn.y")
+        // 開閉で幅が変わっても見た目（カニ＝右下角）が動かないよう、右下角を保存する
+        let f = window.frame
+        UserDefaults.standard.set(Double(f.maxX), forKey: "clawn.right")
+        UserDefaults.standard.set(Double(f.minY), forKey: "clawn.bottom")
+        UserDefaults.standard.removeObject(forKey: "clawn.x")
+        UserDefaults.standard.removeObject(forKey: "clawn.y")
     }
 
     // MARK: - セッション追跡・イベントルーティング
@@ -350,7 +358,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func resetPosition() {
         guard let screen = NSScreen.main?.visibleFrame else { return }
-        window.setFrameOrigin(NSPoint(x: screen.maxX - windowWidth - 24, y: screen.minY + 24))
+        window.setFrameOrigin(NSPoint(x: screen.maxX - window.frame.width - 24, y: screen.minY + 24))
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
