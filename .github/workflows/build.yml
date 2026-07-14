@@ -1,0 +1,20 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ClawnPet.app
+        run: ./build.sh
+      - name: Zip app bundle
+        run: ditto -c -k --keepParent build/ClawnPet.app ClawnPet.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClawnPet
+          path: ClawnPet.zip
