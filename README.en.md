@@ -33,16 +33,20 @@ inspired by "desktop pet" companions, built for Claude.
 ## Install & run
 
 ```bash
-./build.sh                        # requires Xcode Command Line Tools (Swift)
-open build/ClawnPet.app
+git clone https://github.com/sean-sunagaku/claude-desktop-pet.git
+cd claude-desktop-pet
+make install     # build → copy to /Applications → launch (requires Xcode Command Line Tools)
 ```
 
-To keep it around:
+Other targets (`make help` lists them all):
 
-```bash
-cp -R build/ClawnPet.app /Applications/
-open /Applications/ClawnPet.app
-```
+| Command | What it does |
+|---|---|
+| `make install` | Build, deploy to /Applications and launch (also how you update) |
+| `make run` | Debug run in the foreground (`CLAWN_DEBUG=1`, Ctrl-C to quit) |
+| `make restart` | Restart the installed app |
+| `make uninstall` | Stop it and remove the app + its settings |
+| `make build` / `make clean` | Build only / remove the build directory |
 
 Auto-start at login: System Settings → General → Login Items → add ClawnPet.app.
 

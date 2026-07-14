@@ -6,17 +6,16 @@ macOS デスクトップペット。Swift + AppKit、依存ライブラリゼロ
 ## ビルドとデプロイ
 
 ```bash
-./build.sh                 # build/ClawnPet.app が出る（swiftc -O、ad-hoc 署名）
-# デプロイ（/Applications に常駐させる場合）
-pkill -f ClawnPet; sleep 0.5
-rm -rf /Applications/ClawnPet.app && cp -R build/ClawnPet.app /Applications/ClawnPet.app
-open /Applications/ClawnPet.app
+make build      # build/ClawnPet.app（swiftc -O、ad-hoc 署名。実体は ./build.sh）
+make install    # ビルド → pkill → /Applications へ配置 → 起動（デプロイの正規手順）
+make run        # その場でデバッグ起動（CLAWN_DEBUG=1 フォアグラウンド）
+make icon       # tools/render_icon.swift からアイコン全サイズ再生成
+make uninstall  # 停止 + /Applications と UserDefaults を削除
 ```
 
 - Xcode プロジェクトは無い。ソースは `Sources/ClawnPet/*.swift` を丸ごとコンパイル。
 - フレームワークは AppKit と UserNotifications のみ。**AVFoundation を追加しない**（音声機能は削除済み）。
-- アイコンを変えたら `swift tools/render_icon.swift <out.png> <size>` で全サイズ再生成 →
-  `iconutil -c icns` → `Resources/AppIcon.icns` 差し替え（手順の詳細は docs/DEVELOPMENT.md）。
+- CI（GitHub Actions）は `./build.sh` を直接呼ぶ。Makefile を変えても build.sh は残すこと。
 
 ## 検証（ヘッドレスでできる）
 

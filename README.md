@@ -34,16 +34,20 @@ macOS ネイティブのデスクトップペットです。ChatGPT Desktop の 
 ## インストール & 起動
 
 ```bash
-./build.sh                        # ビルド（要 Xcode Command Line Tools / Swift）
-open build/ClawnPet.app           # 起動
+git clone https://github.com/sean-sunagaku/claude-desktop-pet.git
+cd claude-desktop-pet
+make install     # ビルド → /Applications に配置 → 起動（要 Xcode Command Line Tools）
 ```
 
-常用するなら:
+そのほかのコマンド（`make help` で一覧）:
 
-```bash
-cp -R build/ClawnPet.app /Applications/
-open /Applications/ClawnPet.app
-```
+| コマンド | 動作 |
+|---|---|
+| `make install` | ビルドして /Applications に配置・起動（更新もこれ） |
+| `make run` | その場でデバッグ起動（`CLAWN_DEBUG=1`・Ctrl-C で終了） |
+| `make restart` | 常駐版を再起動 |
+| `make uninstall` | 停止して /Applications と設定を削除 |
+| `make build` / `make clean` | ビルドのみ / build ディレクトリ削除 |
 
 ログイン時に自動起動したい場合: システム設定 → 一般 → ログイン項目 に ClawnPet.app を追加。
 
