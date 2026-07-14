@@ -3,6 +3,14 @@
 すべて 2026-07-14 の開発。バージョンは git タグではなくドキュメント上の呼称です
 （該当コミットを併記）。
 
+## v0.5 — 導入コマンドと常駐運用の整備
+
+- Makefile 追加: `make install` / `run` / `restart` / `uninstall` / `icon` / `clean`（`abea5f5`）
+- 🦀 メニューに「ログイン時に起動」トグル（`SMAppService`。BTM 登録・解除を実機検証済み）
+- `tools/watch_resources.sh`: 長時間稼働のリソース観測用 CSV レコーダー
+- ドキュメント体系の整備: リポジトリ CLAUDE.md / docs/DEVELOPMENT.md /
+  docs/PITFALLS.md / CHANGELOG.md、README 日英に索引（`def3660`）
+
 ## v0.4 — ChatGPT ペット構造への刷新と音声削除
 
 - カニは開閉どちらも右下 116×112 領域に 0.52 倍で描画する単一パスに統一。

@@ -48,7 +48,8 @@ Other targets (`make help` lists them all):
 | `make uninstall` | Stop it and remove the app + its settings |
 | `make build` / `make clean` | Build only / remove the build directory |
 
-Auto-start at login: System Settings → General → Login Items → add ClawnPet.app.
+Auto-start at login: **🦀 menu → "ログイン時に起動" (Launch at login)** — registers via
+`SMAppService`; you can also verify or remove it in System Settings → General → Login Items.
 
 ## Controls
 

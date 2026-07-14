@@ -118,6 +118,7 @@ for w in l where (w["kCGWindowOwnerName"] as? String) == "Clawnくん" { print(w
 | `CLAWN_TEST_FACING` | 向き演出の固定（1=右, -1=左） |
 | `CLAWN_CDP_PORT` | claude.ai Web チャット監視を有効化（opt-in） |
 | `CLAWN_DEMO=1` | 起動と同時にデモ再生 |
+| `CLAWN_SET_AUTOSTART=on\|off` | 起動時にログイン項目の登録/解除を実行（メニュー操作の CLI 代替） |
 | `SIGUSR1` | 自己スナップショット PNG |
 | `SIGUSR2` | デモ再生のトグル |
 
@@ -143,6 +144,40 @@ make install    # アプリに反映
 
 個別サイズのプレビューは `swift tools/render_icon.swift /tmp/preview.png 512`。
 手でループを書く場合は zsh の単語分割の罠に注意（[PITFALLS.md](PITFALLS.md) #6）。
+
+## ログイン時自動起動の検証
+
+🦀 メニュー「ログイン時に起動」は `SMAppService.mainApp` で登録する。CLI から検証する場合:
+
+```bash
+pkill -f ClawnPet; CLAWN_SET_AUTOSTART=on open /Applications/ClawnPet.app
+sfltool dumpbtm | grep -iA3 clawn        # BTM（Background Task Management）への登録を確認
+osascript -e 'tell application "System Events" to get the name of every login item'
+# 解除は CLAWN_SET_AUTOSTART=off で同様に
+```
+
+登録されるのは**実行中バンドルのパス**なので、必ず /Applications 版で行うこと
+（build/ から実行すると build/ のパスが登録されてしまう）。
+
+## 長時間稼働の観測
+
+常駐アプリなのでリソースの定常性を確認できるようにしてある:
+
+```bash
+./tools/watch_resources.sh 60 /tmp/clawn_resources.csv   # 60 秒ごとに RSS/CPU/スレッド数を記録
+leaks $(pgrep -f '/Applications/ClawnPet.app' | head -1) | tail -3   # リーク検査（開発ツール同梱）
+```
+
+- 判断基準: **RSS が時間とともに単調増加し続けないこと**。leaks の数十 KB 程度の検出は
+  フレームワーク内部（XPC キャッシュ等）の一回きりの割り当てが大半で、
+  「時間経過で増えるか」を見る。
+- 実測の目安（2026-07-14, v0.5 時点）: RSS ≈ 55MB で安定、CPU ≈ 5%（30fps 描画分）、
+  スレッド 17。leaks は 1 分時点と 3 分時点で 288 件 / 14,400 bytes の**完全同値**
+  （= 増加ゼロ、起動時の一回きりの割り当てのみ）。
+- スリープ復帰: タイマー（RunLoop / DispatchSource）は復帰後に自動継続する。
+  TailReader はオフセット保持なので、スリープ中に溜まった transcript 差分を
+  復帰後にまとめて読む（通知は 4 秒レート制限があるため洪水にはならない）。
+  アニメーション位相は `CACurrentMediaTime()`（スリープ中停止する mach 時間）基準なので飛ばない。
 
 ## CI
 

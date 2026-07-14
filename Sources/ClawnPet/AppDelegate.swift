@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 
 /// 1 セッション分の追跡情報
 final class SessionTrack {
@@ -32,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusMenuInfoItem: NSMenuItem?
     private var collapseMenuItem: NSMenuItem?
     private var notifyMenuItem: NSMenuItem?
+    private var autostartMenuItem: NSMenuItem?
 
     private var demoTimer: Timer?
     private var demoIndex = 0
@@ -64,7 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if ProcessInfo.processInfo.environment["CLAWN_DEMO"] == "1" {
             startDemo()
         }
-        log("ClawnPet started (pid \(ProcessInfo.processInfo.processIdentifier))")
+        // デバッグ/検証用: 起動時に自動起動登録を明示的に切り替える（メニュー操作の CLI 代替）
+        if let v = ProcessInfo.processInfo.environment["CLAWN_SET_AUTOSTART"] {
+            setAutostart(v == "on" || v == "1")
+        }
+        log("ClawnPet started (pid \(ProcessInfo.processInfo.processIdentifier), autostart=\(Self.autostartEnabled))")
     }
 
     private func setupWindow() {
@@ -244,6 +250,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(notify)
         notifyMenuItem = notify
 
+        let autostart = NSMenuItem(title: "ログイン時に起動", action: #selector(toggleAutostart), keyEquivalent: "")
+        autostart.target = self
+        autostart.state = Self.autostartEnabled ? .on : .off
+        menu.addItem(autostart)
+        autostartMenuItem = autostart
+
         menu.addItem(.separator())
         menu.addItem(withTitle: "デモ再生（全モーション確認）", action: #selector(toggleDemo), keyEquivalent: "d").target = self
         menu.addItem(withTitle: "スナップショット保存", action: #selector(saveSnapshot), keyEquivalent: "s").target = self
@@ -262,6 +274,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func toggleNotify() {
         notifier.enabled.toggle()
         notifyMenuItem?.state = notifier.enabled ? .on : .off
+    }
+
+    // MARK: - ログイン時自動起動（SMAppService）
+
+    private static var autostartEnabled: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    /// register/unregister は /Applications に置かれた本体で行うのが前提。
+    /// build/ からのテスト実行でも同じ bundle id なので動くが、登録されるのはそのパスになる点に注意
+    private func setAutostart(_ enable: Bool) {
+        do {
+            if enable {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            log("autostart \(enable ? "registered" : "unregistered") (status=\(SMAppService.mainApp.status.rawValue))")
+        } catch {
+            log("autostart \(enable ? "register" : "unregister") failed: \(error)")
+        }
+        autostartMenuItem?.state = Self.autostartEnabled ? .on : .off
+    }
+
+    @objc private func toggleAutostart() {
+        setAutostart(!Self.autostartEnabled)
     }
 
     @objc private func toggleCollapsedMenu() { toggleCollapsed() }

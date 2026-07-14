@@ -49,7 +49,8 @@ make install     # ビルド → /Applications に配置 → 起動（要 Xcode 
 | `make uninstall` | 停止して /Applications と設定を削除 |
 | `make build` / `make clean` | ビルドのみ / build ディレクトリ削除 |
 
-ログイン時に自動起動したい場合: システム設定 → 一般 → ログイン項目 に ClawnPet.app を追加。
+ログイン時に自動起動したい場合: **🦀 メニュー → 「ログイン時に起動」を ON**
+（`SMAppService` でシステムのログイン項目に登録されます。システム設定 → 一般 → ログイン項目 からも確認・解除できます）。
 
 ## 操作
 
