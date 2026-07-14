@@ -33,7 +33,7 @@ final class PetView: NSView {
 
     // 移動方向を向く演出: -1(左) 〜 0(正面) 〜 +1(右)
     private var facing: CGFloat = 0
-    private var lastWinX: CGFloat?
+    private var lastWinMaxX: CGFloat?
     private let testFacing = CGFloat(Double(ProcessInfo.processInfo.environment["CLAWN_TEST_FACING"] ?? "") ?? 0)
     private var pendingClick: DispatchWorkItem?
 
@@ -55,6 +55,12 @@ final class PetView: NSView {
     override var mouseDownCanMoveWindow: Bool { false } // ドラッグは自前実装（クリック判定のため）
     override var isFlipped: Bool { false }
 
+    private let debugEvents = ProcessInfo.processInfo.environment["CLAWN_DEBUG"] == "1"
+    private func dlog(_ m: String) {
+        guard debugEvents else { return }
+        FileHandle.standardError.write("[petview] \(m)\n".data(using: .utf8)!)
+    }
+
     func tick(_ dt: CFTimeInterval) {
         t += dt
         updateFacing()
@@ -67,11 +73,13 @@ final class PetView: NSView {
     }
 
     /// ウィンドウの水平移動速度から向きを更新（ドラッグ中は performDrag に委譲していて
-    /// マウスイベントが来ないため、フレームごとの位置差分で検出する）
+    /// マウスイベントが来ないため、フレームごとの位置差分で検出する）。
+    /// 右端 (maxX) を追うのは、開閉の伸縮では origin.x が変わっても右端は固定のため
+    /// （開閉を「移動」と誤検知してカニが振り向くのを防ぐ）。
     private func updateFacing() {
-        guard let x = window?.frame.origin.x else { return }
-        let dx = x - (lastWinX ?? x)
-        lastWinX = x
+        guard let x = window?.frame.maxX else { return }
+        let dx = x - (lastWinMaxX ?? x)
+        lastWinMaxX = x
         let target = max(-1, min(1, dx / 6)) // 6px/フレームで全振り
         // 動き出しは素早く向き、止まるとゆっくり正面へ戻る
         let rate: CGFloat = abs(target) > abs(facing) ? 0.35 : 0.10
@@ -106,6 +114,7 @@ final class PetView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         defer { dragStartPoint = nil }
+        dlog("mouseUp loc=\(event.locationInWindow) dragStart=\(String(describing: dragStartPoint)) moved=\(dragMoved) collapsed=\(collapsed) sessions=\(sessionCount) badge=\(badgeRect())")
         guard dragStartPoint != nil, !dragMoved else { return }
         let p = convert(event.locationInWindow, from: nil)
         if collapsed, sessionCount > 0, badgeRect().insetBy(dx: -4, dy: -4).contains(p) {
@@ -182,13 +191,11 @@ final class PetView: NSView {
                       width: d, height: d)
     }
 
-    /// 開時の閉じるボタン（˅）の矩形（カニの頭上）
-    private func closeButtonRect() -> NSRect {
-        let cxScreen = bounds.width - Self.collapsedSize.width / 2
-        return NSRect(x: cxScreen - 12, y: Self.collapsedSize.height + 4, width: 24, height: 24)
-    }
+    /// 開時の閉じるボタン（˅）の矩形。閉時のバッジと同じ場所に置く:
+    /// 右下角アンカーと合わせて、開閉しても画面上の同一座標に「開閉コントロール」が留まる
+    private func closeButtonRect() -> NSRect { badgeRect() }
 
-    /// カニの頭上の丸い ˅ ボタン（クリックでとじる）
+    /// カニの右肩上の丸い ˅ ボタン（クリックでとじる）
     private func drawCloseButton() {
         let rect = closeButtonRect()
         panelColor.setFill()
@@ -239,7 +246,7 @@ final class PetView: NSView {
     /// ミニ表示時の右上バッジ。
     /// セッションがあれば数字バッジ（通知ドット風・気分で色が変わる）、なければ気分絵文字のみ。
     private func drawCollapsedBadge() {
-        let bobY = sin(t * 3) * 1.5
+        // バッジはカニの呼吸・上下動に追従させず固定（インジケーターが揺れると煩わしい）
         if sessionCount > 0 {
             let color: NSColor
             switch mood {
@@ -247,7 +254,7 @@ final class PetView: NSView {
             case .sleeping:           color = NSColor(white: 0.58, alpha: 1)
             default:                  color = doneGreen
             }
-            let rect = badgeRect().offsetBy(dx: 0, dy: bobY)
+            let rect = badgeRect()
             NSGraphicsContext.saveGraphicsState()
             let shadow = NSShadow()
             shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
@@ -276,7 +283,7 @@ final class PetView: NSView {
         case .sleeping: badge = "💤"
         case .idle: return
         }
-        (badge as NSString).draw(at: NSPoint(x: Self.collapsedSize.width - 30, y: Self.collapsedSize.height - 28 + bobY),
+        (badge as NSString).draw(at: NSPoint(x: Self.collapsedSize.width - 30, y: Self.collapsedSize.height - 28),
                                  withAttributes: [.font: NSFont.systemFont(ofSize: 15)])
     }
 
