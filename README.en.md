@@ -17,15 +17,13 @@ inspired by "desktop pet" companions, built for Claude.
 ## What it does
 
 - **Always-on-top floating pet** — no Dock icon, follows you across Spaces, draggable
-- **Detects when you send a message** and goes into "thinking" — status is narrated via session cards and voice
+- **Detects when you send a message** and goes into "thinking" — status is shown on the session cards
 - **Narrates tool use in real time** — terminal work, code edits, web searches, sub-agents…
 - **Jumps and sparkles when the reply lands**, quoting the first line of the response
 - **Session cards** — stacks active sessions as cards (up to 6; overflow shows as a ChatGPT-pet-style "+N" chip), each with a mini crab showing that session's mood
 - **Click a card to jump to that session** — opens it in Claude Desktop via the `claude://resume` deep link
-- **Voice narration** — VOICEVOX (Zundamon) or the macOS system voice reads out events in real time (switchable / off in the menu)
 - **Faces where it's going** — while dragged, Clawn leans into the direction of travel and its eyes follow; it settles back to front when you stop
-- **The crab never changes size** — same structure as ChatGPT's desktop pet: open or closed, the mascot stays 116×112. **Click the badge (session count) to unfold the cards above it**, and **click the ˅ button over its head to close them**. The badge is orange while working, green otherwise; watching, narration and notifications continue while closed
-- **A different voice per session** — VOICEVOX speakers are auto-assigned per project, so you can tell sessions apart by ear
+- **The crab never changes size** — same structure as ChatGPT's desktop pet: open or closed, the mascot stays 116×112. **Click the badge (session count) to unfold the cards above it**, and **click the ˅ button over its head to close them**. The badge is orange while working, green otherwise; watching and notifications continue while closed
 - **Reply notifications** — finished responses also land in Notification Center; clicking one jumps to that session
 - **claude.ai web chat support (opt-in)** — launch Claude Desktop with a debug port and ClawnPet narrates web-chat sends/completions too, via CDP
 - Falls asleep after 8 quiet minutes; wakes on the next event
@@ -58,7 +56,7 @@ Auto-start at login: System Settings → General → Login Items → add ClawnPe
 | Click | Pet it (it celebrates; size never changes) |
 | Double-click | Toggle open / closed (same as badge / ˅) |
 | Drag | Move it anywhere (position is remembered) |
-| Right-click / 🦀 menu bar icon | Menu: voice engine, open/close, demo, quit, … |
+| Right-click / 🦀 menu bar icon | Menu: open/close, notifications, demo, quit, … |
 
 ## How it works (read-only, nothing leaves your machine)
 
@@ -69,20 +67,11 @@ Auto-start at login: System Settings → General → Login Items → add ClawnPe
 | `~/Library/Logs/Claude/main.log` | Claude Desktop send / session-pause events |
 | `~/.claude/sessions/*.json` | Registry of live sessions (with pid liveness check) |
 
-It follows up to 6 transcripts active within the last 30 minutes in parallel; the
-main Clawn narrates whichever session moved most recently. The full investigation
+It follows transcripts active within the last 30 minutes in parallel; the
+main Clawn mirrors whichever session moved most recently. The full investigation
 notes (including what *didn't* work and the CDP path for claude.ai web chat) are in
 [docs/FEASIBILITY.md](docs/FEASIBILITY.md), and the design overview lives in
 [docs/architecture.html](docs/architecture.html) (both Japanese).
-
-### Voice narration (VOICEVOX)
-
-If [VOICEVOX](https://voicevox.hiroshiba.jp/) is running (`localhost:50021`),
-Zundamon narrates your sessions; otherwise ClawnPet falls back to the macOS
-system voice. Switch engines (or mute) from the 🦀 menu bar icon.
-Turn on "セッションごとに声を変える" (per-session voice) and ClawnPet
-auto-assigns an installed VOICEVOX speaker to each project, so you can tell
-who's talking without looking.
 
 ### Reply notifications
 

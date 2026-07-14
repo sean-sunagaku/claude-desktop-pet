@@ -15,13 +15,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let defaultBrain = PetBrain() // セッションが 1 つもない時のメイン表示
     private var tracks: [String: SessionTrack] = [:]
     private var pendingPrompts: [String: (String, Date)] = [:] // sessionId -> (text, at)
-    private let speech = SpeechManager()
     private let notifier = Notifier()
     private var cdpWatcher: CDPWatcher?
 
     private var animTimer: Timer?
     private var brainTimer: Timer?
-    private var voicevoxTimer: Timer?
     private var lastFrame: CFTimeInterval = CACurrentMediaTime()
 
     private var transcriptWatcher: MultiTranscriptWatcher?
@@ -32,9 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private var statusItem: NSStatusItem?
     private var statusMenuInfoItem: NSMenuItem?
-    private var voiceMenuItems: [NSMenuItem] = []
     private var collapseMenuItem: NSMenuItem?
-    private var perProjectVoiceItem: NSMenuItem?
     private var notifyMenuItem: NSMenuItem?
 
     private var demoTimer: Timer?
@@ -55,19 +51,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - 起動
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UserDefaults.standard.register(defaults: [
-            "clawn.voice": SpeechManager.Engine.voicevox.rawValue,
-        ])
         setupWindow()
         setupStatusItem()
         setupWatchers()
         setupSignalHandler()
         startTimers()
-        wireBrain(defaultBrain, track: nil)
+        wireBrain(defaultBrain)
 
         notifier.onOpenSession = { [weak self] sid in self?.openSession(sid) }
         notifier.bootstrap()
-        speech.checkVoicevox { [weak self] ok in self?.log("VOICEVOX alive=\(ok)") }
 
         if ProcessInfo.processInfo.environment["CLAWN_DEMO"] == "1" {
             startDemo()
@@ -137,22 +129,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         primaryTrack()?.brain ?? defaultBrain
     }
 
-    private func wireBrain(_ brain: PetBrain, track: SessionTrack?) {
+    private func wireBrain(_ brain: PetBrain) {
         brain.onChange = { [weak self] _ in self?.applyStatus() }
-        brain.onSpeak = { [weak self, weak track] text, interrupt in
-            guard let self else { return }
-            var prefix = ""
-            if self.tracks.count >= 2, let t = track {
-                prefix = "\(t.project ?? "セッション")、"
-            }
-            self.speech.speak(prefix + text, interrupt: interrupt, project: track?.project)
-        }
     }
 
     private func track(for sessionId: String) -> SessionTrack {
         if let t = tracks[sessionId] { return t }
         let t = SessionTrack(sessionId: sessionId)
-        wireBrain(t.brain, track: t)
+        wireBrain(t.brain)
         tracks[sessionId] = t
         log("track added: \(sessionId)")
         return t
@@ -235,7 +219,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         log("jump: \(url.absoluteString)")
         NSWorkspace.shared.open(url)
-        speech.speak("セッションをひらくよ！", interrupt: false)
     }
 
     // MARK: - メニューバー
@@ -249,31 +232,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(info)
         statusMenuInfoItem = info
         menu.addItem(.separator())
-
-        // 音声エンジン選択
-        let voiceMenu = NSMenu()
-        let engines: [(String, SpeechManager.Engine)] = [
-            ("オフ", .off), ("システム音声", .system), ("VOICEVOX（ずんだもん）", .voicevox),
-        ]
-        for (title, engine) in engines {
-            let mi = NSMenuItem(title: title, action: #selector(setVoice(_:)), keyEquivalent: "")
-            mi.target = self
-            mi.tag = engine.rawValue
-            voiceMenu.addItem(mi)
-            voiceMenuItems.append(mi)
-        }
-        voiceMenu.addItem(.separator())
-        let perProject = NSMenuItem(title: "セッションごとに声を変える", action: #selector(togglePerProjectVoice), keyEquivalent: "")
-        perProject.target = self
-        perProject.state = speech.perProjectVoice ? .on : .off
-        voiceMenu.addItem(perProject)
-        perProjectVoiceItem = perProject
-        let test = NSMenuItem(title: "こえテスト", action: #selector(voiceTest), keyEquivalent: "")
-        test.target = self
-        voiceMenu.addItem(test)
-        let voiceRoot = NSMenuItem(title: "こえ（実況ボイス）", action: nil, keyEquivalent: "")
-        menu.addItem(voiceRoot)
-        menu.setSubmenu(voiceMenu, for: voiceRoot)
 
         let collapse = NSMenuItem(title: "セッションをとじる", action: #selector(toggleCollapsedMenu), keyEquivalent: "o")
         collapse.target = self
@@ -294,42 +252,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(withTitle: "Clawn を終了", action: #selector(quit), keyEquivalent: "q").target = self
         item.menu = menu
         statusItem = item
-        updateVoiceMenu()
-    }
-
-    private func updateVoiceMenu() {
-        for mi in voiceMenuItems {
-            mi.state = (mi.tag == speech.engine.rawValue) ? .on : .off
-        }
     }
 
     private func showContextMenu(_ event: NSEvent) {
         guard let menu = statusItem?.menu else { return }
         NSMenu.popUpContextMenu(menu, with: event, for: petView)
-    }
-
-    @objc private func setVoice(_ sender: NSMenuItem) {
-        speech.engine = SpeechManager.Engine(rawValue: sender.tag) ?? .off
-        updateVoiceMenu()
-        if speech.engine == .voicevox {
-            speech.checkVoicevox { [weak self] ok in
-                self?.speech.speak(ok ? "ずんだもんで じっきょうするのだ！" : "ボイスボックスが みつからないから、システム音声で実況するね", interrupt: true)
-            }
-        } else if speech.engine == .system {
-            speech.speak("システム音声で実況するね！", interrupt: true)
-        }
-    }
-
-    @objc private func voiceTest() {
-        speech.checkVoicevox { [weak self] _ in
-            self?.speech.speak("こんにちは！クラウンだよ！きょうも いっしょに がんばろうね", interrupt: true)
-        }
-    }
-
-    @objc private func togglePerProjectVoice() {
-        speech.perProjectVoice.toggle()
-        perProjectVoiceItem?.state = speech.perProjectVoice ? .on : .off
-        speech.speak(speech.perProjectVoice ? "セッションごとに 声を変えるね！" : "声を そろえるね", interrupt: true)
     }
 
     @objc private func toggleNotify() {
@@ -433,10 +360,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             if pruned { self.log("tracks pruned -> \(self.tracks.count)") }
             self.applyStatus()
-        }
-
-        voicevoxTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            self?.speech.checkVoicevox(nil)
         }
     }
 

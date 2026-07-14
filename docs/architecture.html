@@ -118,16 +118,16 @@
   <a href="#statemachine">5. 状態マシン</a>
   <a href="#routing">6. イベントルーティング</a>
   <a href="#layout">7. UI レイアウト</a>
-  <a href="#voice">8. 音声実況</a>
+  <a href="#voice">8. 応答通知</a>
   <a href="#debug">9. 検証とデバッグ</a>
   <a href="#limits">10. 制約と拡張</a>
 </nav>
 
 <section id="overview">
 <h2>1. 概要と設計原則</h2>
-<p>ClawnPet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・セッションカード・音声で実況するアプリです。</p>
+<p>ClawnPet は、デスクトップ最前面に常駐するカニのマスコット「Clawn くん」が、Claude Desktop / Claude Code のセッション活動（プロンプト送信・ツール実行・応答到着）をリアルタイムに表情・セッションカードで実況するアプリです。</p>
 <div class="cards">
-  <div class="card"><h4>📖 読み取りのみ</h4><p>Claude アプリが元々ローカルに書き出すファイルを tail するだけ。ネットワーク送信・プロセス介入・UI 自動操作は一切しない（VOICEVOX への localhost リクエストを除く）。</p></div>
+  <div class="card"><h4>📖 読み取りのみ</h4><p>Claude アプリが元々ローカルに書き出すファイルを tail するだけ。ネットワーク送信・プロセス介入・UI 自動操作は一切しない（opt-in の CDP 接続を除く）。</p></div>
   <div class="card"><h4>🧩 依存ゼロ</h4><p>Swift + AppKit + AVFoundation のみ。<code>swiftc</code> 一発でビルドでき、パッケージマネージャも Xcode プロジェクトも不要。</p></div>
   <div class="card"><h4>⏱ 1 秒ポーリング</h4><p>FSEvents ではなく単純なポーリング + 差分 tail。堅牢でデバッグしやすく、消費リソースも無視できる規模（stat 数百回/秒以下）。</p></div>
   <div class="card"><h4>🎭 セッション = Brain</h4><p>セッションごとに独立した状態マシン（PetBrain）を持ち、メインの Clawn は「直近アクティブなセッション」を実況する。</p></div>
@@ -181,15 +181,15 @@
   <text x="582" y="276" fill="var(--ink)" font-size="11">PetBrain（状態マシン）を 1 個ずつ</text>
   <text x="582" y="294" fill="var(--ink)" font-size="11">mood / statusLine / lastEvent</text>
   <text x="582" y="312" fill="var(--sub)" font-size="11">最大 6 セッション追跡</text>
-  <!-- View & Speech -->
+  <!-- View & Notifier -->
   <rect x="290" y="370" width="240" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
   <text x="302" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">PetView（AppKit / 30fps）</text>
   <text x="302" y="414" fill="var(--ink)" font-size="11">メイン Clawn + バッジ</text>
   <text x="302" y="432" fill="var(--ink)" font-size="11">セッションカード / ミニ表示</text>
   <rect x="570" y="370" width="230" height="80" rx="12" fill="var(--panel)" stroke="var(--coral)" stroke-width="1.5"/>
-  <text x="582" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">SpeechManager</text>
-  <text x="582" y="414" fill="var(--ink)" font-size="11">VOICEVOX (localhost:50021)</text>
-  <text x="582" y="432" fill="var(--ink)" font-size="11">↳ 不在時はシステム音声に fallback</text>
+  <text x="582" y="394" fill="var(--coral-dark)" font-size="12" font-weight="bold">Notifier</text>
+  <text x="582" y="414" fill="var(--ink)" font-size="11">通知センター（応答到着）</text>
+  <text x="582" y="432" fill="var(--ink)" font-size="11">↳ 許可が無ければ osascript に fallback</text>
   <!-- arrows -->
   <line x1="240" y1="71" x2="300" y2="71" stroke="var(--sub)" marker-end="url(#arr)"/>
   <line x1="240" y1="111" x2="300" y2="111" stroke="var(--sub)" marker-end="url(#arr)"/>
@@ -203,7 +203,7 @@
   <line x1="700" y1="330" x2="700" y2="368" stroke="var(--sub)" marker-end="url(#arr)"/>
   <text x="708" y="352" fill="var(--sub)" font-size="10">onSpeak</text>
 </svg>
-<figcaption>データフロー: ローカルファイル → Watchers → Router → セッションごとの PetBrain → 描画/音声</figcaption>
+<figcaption>データフロー: ローカルファイル → Watchers → Router → セッションごとの PetBrain → 描画/通知</figcaption>
 </figure>
 <p>すべてのウォッチャーはバックグラウンドの serial queue でポーリングし、イベントは <code>DispatchQueue.main</code> に載せ替えてから Router に渡します。UI と状態マシンはメインスレッドのみで触るため、ロックは不要です。</p>
 </section>
@@ -228,7 +228,6 @@
 <tr><td><code>main.swift</code></td><td>エントリポイント。<code>NSApplication</code> を accessory（Dock 非表示）で起動</td><td>—</td></tr>
 <tr><td><code>PetCore.swift</code></td><td>ドメイン層。イベント定義・セッションごとの状態マシン・表示/発話文言の生成</td><td><code>PetEvent</code> <code>PetMood</code> <code>PetBrain</code> <code>SessionCard</code></td></tr>
 <tr><td><code>Watchers.swift</code></td><td>ファイル監視層。差分 tail（ローテーション対応）と JSONL / ログのパース</td><td><code>TailReader</code> <code>PollingWatcher</code> と各 Watcher</td></tr>
-<tr><td><code>Speech.swift</code></td><td>音声実況。VOICEVOX HTTP API とシステム音声の切替・レート制限</td><td><code>SpeechManager</code></td></tr>
 <tr><td><code>PetView.swift</code></td><td>描画層。Clawn 本体（全モーション）・セッションカード・開閉コントロール（バッジ / ˅）・クリック/ドラッグ判定</td><td><code>PetView</code></td></tr>
 <tr><td><code>Notifier.swift</code></td><td>応答到着の通知センター連携。<code>UNUserNotificationCenter</code> → 許可が下りない環境は <code>osascript</code> にフォールバック。通知タップでセッションジャンプ</td><td><code>Notifier</code></td></tr>
 <tr><td><code>CDPWatcher.swift</code></td><td>claude.ai Web チャット監視（opt-in）。<code>/json</code> でページ探索 → WebSocket で Network ドメイン購読</td><td><code>CDPWatcher</code></td></tr>
@@ -291,12 +290,12 @@
 <figcaption>気分の遷移。タイムアウト系（thinking 15分 / working 8分停滞 → idle）は保険として別途持つ</figcaption>
 </figure>
 <table>
-<tr><th>遷移トリガー</th><th>遷移先</th><th>実況（音声）</th></tr>
-<tr><td>userPrompt / userMessage / desktopSendMessage</td><td>thinking</td><td>「（プロンプト先頭20文字）、かんがえちゅう！」</td></tr>
-<tr><td>toolUse（working への進入時のみ発話）</td><td>working</td><td>「ターミナルでさぎょうちゅう！」等ツール別</td></tr>
-<tr><td>assistantText</td><td>celebrating（7 秒）</td><td>「へんじがきたよ！（本文先頭26文字）」※割り込み再生</td></tr>
-<tr><td>celebrating タイムアウト / desktopSessionPaused</td><td>idle</td><td>—</td></tr>
-<tr><td>8 分イベントなし</td><td>sleeping</td><td>「おやすみなさい」</td></tr>
+<tr><th>遷移トリガー</th><th>遷移先</th><th>カードの表示</th></tr>
+<tr><td>userPrompt / userMessage / desktopSendMessage</td><td>thinking</td><td>「うーん、かんがえ中」+ プロンプト先頭</td></tr>
+<tr><td>toolUse</td><td>working</td><td>「ターミナルで作業中」等ツール別ラベル</td></tr>
+<tr><td>assistantText</td><td>celebrating（7 秒）</td><td>「へんじが きたよ！」+ 応答本文の先頭</td></tr>
+<tr><td>celebrating タイムアウト / desktopSessionPaused</td><td>idle</td><td>「まったり中〜」</td></tr>
+<tr><td>8 分イベントなし</td><td>sleeping</td><td>「すやすや…」</td></tr>
 </table>
 </section>
 
@@ -305,7 +304,7 @@
 <p>Router（AppDelegate）は sessionId（= transcript のファイル名）ごとに <code>SessionTrack</code> を生成し、イベントを対応する PetBrain に配送します。</p>
 <ul class="notes">
   <li><b>primary 選定:</b> <code>lastEvent</code> が最新の Track がメインの Clawn を駆動する。セッションが 1 つもない時は <code>defaultBrain</code>（挨拶用）を表示。</li>
-  <li><b>pending prompt 昇格:</b> <code>history.jsonl</code> のプロンプトは transcript より先に届くことがある。未知の sessionId なら 15 秒だけ保留し、transcript 側の <code>userMessage</code> が来た瞬間に本文付きの <code>userPrompt</code> へ昇格させる。これで新規セッションの 1 通目から本文を実況（音声・通知）に使える。</li>
+  <li><b>pending prompt 昇格:</b> <code>history.jsonl</code> のプロンプトは transcript より先に届くことがある。未知の sessionId なら 15 秒だけ保留し、transcript 側の <code>userMessage</code> が来た瞬間に本文付きの <code>userPrompt</code> へ昇格させる。これで新規セッションの 1 通目から本文をカード表示・通知に使える。</li>
   <li><b>prune:</b> 30 分イベントがない Track は破棄（カードも消える）。追跡は直近更新の transcript 最大 6 本。</li>
   <li><b>Desktop イベント:</b> <code>main.log</code> の sessionId（<code>local_*</code>）は transcript の sessionId と対応しないため、primary Track に配送する。</li>
   <li><b>サブエージェント:</b> <code>isSidechain: true</code> の行はツール実行のみ拾い、「(サブエージェント)」の接頭辞を付ける。</li>
@@ -360,15 +359,12 @@
 </section>
 
 <section id="voice">
-<h2>8. 音声実況（SpeechManager）</h2>
+<h2>8. 応答通知（Notifier）</h2>
 <ul class="notes">
-  <li><b>エンジン:</b> VOICEVOX（<code>http://127.0.0.1:50021</code>, 既定話者 ID 3 = ずんだもん）→ 不在時は自動でシステム音声（<code>AVSpeechSynthesizer</code>, ja-JP）へフォールバック。メニューから OFF / システム / VOICEVOX を切替可能。</li>
-  <li><b>VOICEVOX API フロー:</b> <code>POST /audio_query?speaker=3&amp;text=…</code> → 返ってきた JSON をそのまま <code>POST /synthesis?speaker=3</code> へ → WAV を <code>AVAudioPlayer</code> で再生。</li>
-  <li><b>レート制限:</b> 通常発話は 7 秒間隔。応答到着（celebrating）だけは割り込みフラグ付きで必ず喋る。</li>
-  <li><b>マルチセッション時:</b> 2 セッション以上追跡中はプロジェクト名を接頭辞に付ける（「pet、へんじがきたよ！」）。</li>
-  <li><b>セッションごとの声:</b> 「セッションごとに声を変える」ON でプロジェクト名のハッシュから VOICEVOX のインストール済み話者を安定的に割り当て（同じプロジェクトは常に同じ声）。</li>
-  <li><b>死活監視:</b> 30 秒ごとに <code>GET /version</code>（タイムアウト 1.2 秒）で VOICEVOX の生存確認。</li>
-  <li><b>通知センター:</b> 応答到着は <code>Notifier</code> 経由で macOS 通知にも出せる（4 秒レート制限、通知タップで <code>claude://resume</code> ジャンプ）。</li>
+  <li><b>通知センター:</b> 応答到着（assistantText）を macOS 通知に表示。🦀 メニュー「返信を通知センターに出す」で ON/OFF。</li>
+  <li><b>フォールバック:</b> <code>UNUserNotificationCenter</code> を第一候補に、ad-hoc 署名などで許可が下りない環境では自動で <code>osascript</code> 通知に切り替える。</li>
+  <li><b>レート制限:</b> 4 秒間隔（連続応答での通知洪水を防ぐ）。</li>
+  <li><b>セッションジャンプ:</b> 通知タップで <code>claude://resume?session=&lt;uuid&gt;</code> を開き、該当セッションにフォーカスする。</li>
 </ul>
 </section>
 
@@ -379,7 +375,7 @@
 <tr><td><code>CLAWN_DEBUG=1</code></td><td>イベント・状態遷移・スナップショットの記録を stderr へ出力</td></tr>
 <tr><td><code>CLAWN_WATCH_DIR</code> / <code>CLAWN_HISTORY</code> / <code>CLAWN_MAINLOG</code></td><td>監視パスの差し替え。フェイク JSONL を append して全遷移を再現テストできる</td></tr>
 <tr><td><code>SIGUSR1</code></td><td>ペットの現在の見た目を PNG に自己レンダリング（<code>CLAWN_SNAPSHOT_PATH</code>）。スクリーンショット権限不要の自己検証手段</td></tr>
-<tr><td><code>SIGUSR2</code> / メニュー「デモ再生」</td><td>プロンプト→ツール実行→応答→片付けの全モーション+音声を順に再生</td></tr>
+<tr><td><code>SIGUSR2</code> / メニュー「デモ再生」</td><td>プロンプト→ツール実行→応答→片付けの全モーションを順に再生</td></tr>
 <tr><td>メニュー「こえテスト」</td><td>現在のエンジンで 1 フレーズ発話</td></tr>
 </table>
 <div class="callout">🧪 <b>開発時の実績:</b> フェイクイベントでの全遷移テスト → 実環境で開発セッション自身のツール実行を 1 秒以内に検知することを確認、という 2 段構えで検証。詳細は <code>docs/FEASIBILITY.md</code>。</div>

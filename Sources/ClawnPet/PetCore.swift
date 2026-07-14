@@ -50,8 +50,6 @@ final class PetBrain {
     private var moodChangedAt = Date()
     private var thinkingSince: Date?
     var onChange: ((PetStatus) -> Void)?
-    /// (テキスト, 割り込み) — 音声実況。割り込み=true は再生中でも喋る
-    var onSpeak: ((String, Bool) -> Void)?
 
     // 調整パラメータ
     private let celebrateDuration: TimeInterval = 7
@@ -79,30 +77,24 @@ final class PetBrain {
             thinkingSince = Date()
             let t = Self.trim(text, 30)
             set(.thinking, "うーん、かんがえ中", projectTag(project) + "「\(t)」")
-            onSpeak?("\(Self.trim(text, 20))、かんがえちゅう！", false)
         case .userMessage(let project):
             if status.mood != .thinking {
                 thinkingSince = Date()
                 set(.thinking, "うーん、かんがえ中", projectTag(project) + "メッセージを受けとったよ")
-                onSpeak?("かんがえちゅう！", false)
             }
         case .toolUse(let name, let project, let sidechain):
             thinkingSince = nil
             let label = Self.toolLabel(name)
             let sub = sidechain ? "(サブエージェント) " : ""
-            let entering = (status.mood != .working)
             set(.working, "\(label)中", sub + projectTag(project) + "カタカタ🦀")
-            if entering { onSpeak?("\(label)ちゅう！", false) }
         case .toolResult:
             break // working 継続
         case .assistantText(let snippet, let project):
             thinkingSince = nil
             set(.celebrating, "へんじが きたよ！", projectTag(project) + "「\(Self.trim(snippet, 32))」")
-            onSpeak?("へんじがきたよ！\(Self.trim(snippet, 26))", true)
         case .desktopSendMessage(let length):
             thinkingSince = Date()
             set(.thinking, "うーん、かんがえ中", "Desktop から \(length) 文字そうしん！")
-            onSpeak?("そうしんしたよ！かんがえちゅう", false)
         case .desktopSessionPaused:
             if status.mood == .working || status.mood == .thinking {
                 thinkingSince = nil
@@ -111,7 +103,6 @@ final class PetBrain {
         case .desktopWindowFocused:
             if status.mood == .sleeping {
                 set(.idle, "おはよう！", "Claude Desktop がひらいたよ")
-                onSpeak?("おはよう！", false)
             }
         case .sessionSwitch(let project):
             if let p = project, !p.isEmpty, status.mood == .idle || status.mood == .sleeping {
@@ -136,7 +127,6 @@ final class PetBrain {
         case .idle:
             if now.timeIntervalSince(lastEventDate) > sleepAfter {
                 set(.sleeping, "すやすや…", "イベントが来たら起きるよ")
-                onSpeak?("おやすみなさい", false)
             }
         case .sleeping, .working:
             // working は次のイベント（assistantText 等）で解除される
