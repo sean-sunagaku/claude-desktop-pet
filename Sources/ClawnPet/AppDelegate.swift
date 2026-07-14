@@ -45,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var signalSource2: DispatchSourceSignal?
 
     private let debug = ProcessInfo.processInfo.environment["CLAWN_DEBUG"] == "1"
-    private let windowWidth: CGFloat = 280
+    private let windowWidth: CGFloat = 260
 
     private var cardsOn: Bool {
         get { UserDefaults.standard.bool(forKey: "clawn.cards") }
@@ -119,7 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         chevron.isBordered = false
         chevron.font = NSFont.systemFont(ofSize: 12, weight: .bold)
         chevron.contentTintColor = NSColor(red: 0.62, green: 0.29, blue: 0.18, alpha: 0.85)
-        chevron.frame = NSRect(x: windowWidth - 40, y: 290, width: 28, height: 20)
+        chevron.frame = NSRect(x: windowWidth - 40, y: PetView.petAreaHeight - 30, width: 28, height: 20)
         chevron.toolTip = "セッションカードの表示/非表示"
         petView.addSubview(chevron)
 

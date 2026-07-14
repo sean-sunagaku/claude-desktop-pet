@@ -13,7 +13,8 @@ final class PetView: NSView {
     var collapsed = false
     var sessionCount = 0 // ミニ表示バッジ用のアクティブセッション数
 
-    static let petAreaHeight: CGFloat = 320 // ペット+吹き出しの基本領域
+    static let petAreaHeight: CGFloat = 244 // ペット+吹き出しの基本領域
+    private static let expandedScale: CGFloat = 0.74 // 展開時のカニ縮尺（ミニとのギャップ緩和）
     static let cardHeight: CGFloat = 48
     static let cardGap: CGFloat = 6
     static let collapsedSize = NSSize(width: 116, height: 112)
@@ -154,7 +155,14 @@ final class PetView: NSView {
             return
         }
 
+        // 展開時もカニは少し縮小して描く（吹き出し・カードの文字サイズは維持）
+        NSGraphicsContext.saveGraphicsState()
+        let tf = NSAffineTransform()
+        tf.translateX(by: cx * (1 - Self.expandedScale), yBy: 8)
+        tf.scale(by: Self.expandedScale)
+        tf.concat()
         drawCrab(cx: cx, baseY: baseY, breatheY: breatheY, jump: jump, phase: phase)
+        NSGraphicsContext.restoreGraphicsState()
         drawBubble(cx: cx)
         drawSessionCards()
     }
@@ -628,7 +636,7 @@ final class PetView: NSView {
 
         let statusStr = status as NSString
         let contextStr = contextText as NSString
-        let maxTextWidth: CGFloat = 218
+        let maxTextWidth: CGFloat = 206
         let sSize = statusStr.boundingRect(with: NSSize(width: maxTextWidth, height: 60), options: [.usesLineFragmentOrigin], attributes: statusAttrs).size
         let cSize = contextStr.boundingRect(with: NSSize(width: maxTextWidth, height: 60), options: [.usesLineFragmentOrigin], attributes: contextAttrs).size
 
@@ -636,7 +644,7 @@ final class PetView: NSView {
         let bw = min(maxTextWidth, max(sSize.width, cSize.width)) + pad * 2
         let bh = sSize.height + cSize.height + pad * 2 + 3
         let bx = min(max(cx - bw / 2, 6), bounds.width - bw - 6)
-        let by: CGFloat = 152 // カニの頭のすぐ上に固定し、上方向に伸びる
+        let by: CGFloat = 114 // カニ（縮小描画）の頭のすぐ上に固定し、上方向に伸びる
 
         let alpha: CGFloat = (mood == .sleeping) ? 0.55 : 1.0
 
