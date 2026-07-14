@@ -16,7 +16,8 @@ make uninstall  # 停止 + /Applications と UserDefaults を削除
 - Xcode プロジェクトは無い。ソースは `Sources/ClawnPet/*.swift` を丸ごとコンパイル。
 - フレームワークは AppKit / UserNotifications / ServiceManagement のみ。
   **AVFoundation を追加しない**（音声機能は削除済み）。
-- CI（GitHub Actions）は `./build.sh` を直接呼ぶ。Makefile を変えても build.sh は残すこと。
+- CI は使っていない（2026-07-14 に削除。ビルド検証はローカルの `make build` で行う）。
+  `build.sh` は Makefile が呼ぶビルドの実体なので残すこと。
 - **名前の使い分け**: アプリ名・表示名は「Claude Pet」、.app と実行ファイルは `ClaudePet`（スペース回避）。
   bundle id `com.sunagaku.clawnpet`・ソースディレクトリ `Sources/ClawnPet/`・`CLAWN_*` 環境変数・
   `clawn.*` defaults キーは**旧名のまま**（内部識別子。変えると設定・自動起動登録が飛ぶ）。

@@ -8,6 +8,7 @@
 - **アプリ名を「Claude Pet」に改名**。.app / 実行ファイルは `ClaudePet`（スペース回避）、
   ウィンドウ owner 名は「Claude Pet」。bundle id・`CLAWN_*` 環境変数・`clawn.*` defaults・
   ソースディレクトリは互換性のため旧名のまま。キャラクター名は「Clawn くん」で継続
+- GitHub Actions の CI を削除（個人開発でローカル `make build` 検証で十分なため）
 
 - Makefile 追加: `make install` / `run` / `restart` / `uninstall` / `icon` / `clean`（`abea5f5`）
 - 🦀 メニューに「ログイン時に起動」トグル（`SMAppService`。BTM 登録・解除を実機検証済み）
